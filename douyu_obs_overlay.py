@@ -1,19 +1,23 @@
+from pathlib import Path
 import asyncio
 import errno
 import platform
-import subprocess
+import numpy as np
+# import subprocess
 import threading
 import websockets
 import ssl
 import certifi
 import re
 import json
-import pyttsx3
 import os
 import sys
 import time
 from queue import Queue
 from datetime import datetime
+import torch
+import sounddevice as sd
+from TTS.api import TTS
 
 class TTSManager:
     def __init__(self,
@@ -32,49 +36,82 @@ class TTSManager:
         self.max_backlog = max_backlog
         self.min_interval = min_interval
         self._last_time = 0.0
+        self.sourceList = self._get_wav_list()
+        # 1. 设备
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # 2. 加载 XTTS-v2（多语种 + 声音克隆）
+        #   第一次会自动从 HuggingFace 下载模型
+        self.tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=(self.device=="cuda"))
 
         self.queue: Queue[str] = Queue()
         self.system = platform.system()
 
-        # 只有在 Windows 下才初始化 pyttsx3
-        self.engine = None
-        if self.system == "Windows":
-            self.engine = pyttsx3.init()
-
         t = threading.Thread(target=self._worker, daemon=True)
         t.start()
 
+    # 获取source 文件夹下所有 wav 文件路径
+    def _get_wav_list(self, folder="source"):
+        folder_path = Path(folder)
+
+        if not folder_path.exists():
+            print(f"[TTS] 警告：目录不存在：{folder_path.resolve()}")
+            return []
+
+        wav_paths = [str(p.resolve()) for p in folder_path.glob("*.wav")]
+        print("[TTS] 加载到的 wav 文件：", wav_paths)
+        return wav_paths
+
     # —— 真正的「阻塞式播报」逻辑，全程在一个线程里 —— #
     def _speak_blocking(self, text: str):
-        if self.system == "Darwin":  # macOS，用系统 say 命令
-            try:
-                # 你可以换成自己喜欢的中文语音，比如 "Ting-Ting"、"Xiao Na" 等
-                subprocess.run(
-                    ["say", "-v", "Ting-Ting", text],
-                    check=False
-                )
-            except Exception as e:
-                print("macOS say error:", e)
+        try:
+            wav = self.tts.tts(
+                text=text,
+                speaker_wav=self.sourceList,  # 也可以传多段 wav 做平均，比如 ["a.wav","b.wav"]
+                language="zh",
+                split_sentences=True        # 长文本会自动按句切分
+            )
 
-        elif self.system == "Windows":  # Windows 仍然用 pyttsx3
-            try:
-                subprocess.run([
-                    "powershell",
-                    "-Command",
-                    f"Add-Type -AssemblyName System.Speech; "
-                    f"(New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{text}')"
-                ])
-            except Exception as e:
-                print("Windows SAPI error:", e)
+            # 有些版本返回的是 list，保险起见转成 np.array
+            wav = np.array(wav, dtype=np.float32)
 
-        else:  # Linux 等，尝试用 espeak
-            try:
-                subprocess.run(
-                    ["espeak", text],
-                    check=False
-                )
-            except Exception as e:
-                print("espeak error:", e)
+            # 采样率从底层 synthesizer 里拿
+            sample_rate = self.tts.synthesizer.output_sample_rate
+
+            # 用 sounddevice 播放
+            sd.stop()
+            sd.play(wav, samplerate=sample_rate, blocking=True)
+        except Exception as e:
+            print("Windows SAPI error:", e)
+        # if self.system == "Darwin":  # macOS，用系统 say 命令
+        #     try:
+        #         # 你可以换成自己喜欢的中文语音，比如 "Ting-Ting"、"Xiao Na" 等
+        #         subprocess.run(
+        #             ["say", "-v", "Ting-Ting", text],
+        #             check=False
+        #         )
+        #     except Exception as e:
+        #         print("macOS say error:", e)
+
+        # elif self.system == "Windows":  # Windows 仍然用
+        #     try:
+        #         subprocess.run([
+        #             "powershell",
+        #             "-Command",
+        #             f"Add-Type -AssemblyName System.Speech; "
+        #             f"(New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{text}')"
+        #         ])
+        #     except Exception as e:
+        #         print("Windows SAPI error:", e)
+
+        # else:  # Linux 等，尝试用 espeak
+        #     try:
+        #         subprocess.run(
+        #             ["espeak", text],
+        #             check=False
+        #         )
+        #     except Exception as e:
+        #         print("espeak error:", e)
 
     # —— worker 线程：严格串行、不会被打断 —— #
     def _worker(self):
@@ -120,8 +157,8 @@ class TTSManager:
 tts = TTSManager(mode="all", min_interval=0.5)
 
 # ========= 配置区域 =========
-ROOM_ID = 242737   # TODO：改成你的斗鱼房间号
-# ROOM_ID = 500269   # TODO：改成你的斗鱼房间号
+# ROOM_ID = 242737   # TODO：改成你的斗鱼房间号
+ROOM_ID = 500269   # TODO：改成你的斗鱼房间号
 
 # OBS 浏览器叠加层的本地 WebSocket 服务
 OBS_WS_HOST = "127.0.0.1"
@@ -322,20 +359,20 @@ async def connect_douyu():
                     for msg in msgs:
                         msg_type = msg.get("type", "")
 
-                        # 普通弹幕
-                        # if msg_type == "chatmsg":
-                        #     uname = msg.get("nn", "某位观众")
-                        #     text = msg.get("txt", "")
-                        #     print(f"[{now}] [弹幕] {uname}：{text}")
+                        #普通弹幕
+                        if msg_type == "chatmsg":
+                            uname = msg.get("nn", "某位观众")
+                            text = msg.get("txt", "")
+                            print(f"[{now}] [弹幕] {uname}：{text}")
 
-                        #     event = {
-                        #         "event": "chat",
-                        #         "user": uname,
-                        #         "content": text,
-                        #         "time": now,
-                        #     }
-                        #     asyncio.create_task(broadcast_to_overlay(event))
-                        #     tts.speak_normal(f"{uname}说：{text}")
+                            event = {
+                                "event": "chat",
+                                "user": uname,
+                                "content": text,
+                                "time": now,
+                            }
+                            asyncio.create_task(broadcast_to_overlay(event))
+                            tts.speak_normal(f"{uname}说：{text}")
 
                         # # 礼物
                         # elif msg_type == "dgb":
@@ -355,7 +392,7 @@ async def connect_douyu():
                         #     tts.speak_normal(f"{uname}送出了{cnt}个{gname}")
 
                         # 高能弹幕（SuperChat）
-                        if msg_type == "voice_trlt":
+                        elif msg_type == "voice_trlt":
                             # 默认从普通字段里兜底
                             # 如果有 list 字段，优先从 list 里解析（voice_trlt 会走这里）
                             list_raw = msg.get("list", "")
