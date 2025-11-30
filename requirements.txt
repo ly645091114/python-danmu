@@ -1,6 +1,8 @@
 certifi==2025.11.12
+noisereduce==3.0.3
+pedalboard==0.9.19
 python_socks==2.7.3
 sounddevice==0.5.3
+soundfile==0.13.1
 TTS==0.22.0
 websockets==15.0.1
-transformers>=4.36,<4.43

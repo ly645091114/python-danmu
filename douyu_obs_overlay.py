@@ -98,7 +98,7 @@ class TTSManager:
                 text=text,
                 speaker_wav=self.sourceList,  # 也可以传多段 wav 做平均，比如 ["a.wav","b.wav"]
                 language="zh",
-                split_sentences=True        # 长文本会自动按句切分
+                split_sentences=True,        # 长文本会自动按句切分
             )
 
             # 有些版本返回的是 list，保险起见转成 np.array
