@@ -102,6 +102,10 @@ def ensure_venv():
     else:
         print(f"[INFO] 已检测到 Python 3.10 虚拟环境: {VENV_DIR}")
 
+def has_nvidia_gpu() -> bool:
+    """简单通过 nvidia-smi 判断是否有 NVIDIA GPU"""
+    return shutil.which("nvidia-smi") is not None
+
 
 def install_requirements():
     if not REQUIREMENTS_FILE.exists():
@@ -117,7 +121,14 @@ def install_requirements():
     except Exception as e:
         print("[WARN] pip / setuptools / wheel 升级失败（忽略）:", e)
 
-    print("[INFO] 安装 CPU 版本 PyTorch 2.1.2 ...")
+     # 选择 index-url：有显卡 → cu121；无显卡 → cpu
+    if has_nvidia_gpu():
+        index_url = "https://download.pytorch.org/whl/cu121"
+        print("[INFO] 检测到 NVIDIA GPU，将安装 CUDA 12.1 版 PyTorch (cu121)。")
+    else:
+        index_url = "https://download.pytorch.org/whl/cpu"
+        print("[INFO] 未检测到 NVIDIA GPU，将安装 CPU 版 PyTorch。")
+
     try:
         subprocess.run(
             pip_cmd + [
@@ -125,7 +136,7 @@ def install_requirements():
                 "torch==2.1.2",
                 "torchaudio==2.1.2",
                 "--index-url",
-                "https://download.pytorch.org/whl/cpu",
+                index_url,
             ],
             check=True,
         )

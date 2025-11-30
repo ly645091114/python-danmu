@@ -38,11 +38,12 @@ class TTSManager:
         self._last_time = 0.0
         self.sourceList = self._get_wav_list()
         # 1. 设备
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = self.select_device_for_tts()
 
         # 2. 加载 XTTS-v2（多语种 + 声音克隆）
         #   第一次会自动从 HuggingFace 下载模型
-        self.tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=(self.device=="cuda"))
+        self.tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
+        self.tts.to(self.device)
 
         self.queue: Queue[str] = Queue()
         self.system = platform.system()
@@ -51,6 +52,34 @@ class TTSManager:
         t.start()
 
     # 获取source 文件夹下所有 wav 文件路径
+    def select_device_for_tts(self):
+        """
+        显卡架构判断：
+        - 50 系（sm_120）强制 CPU
+        - 40 系（sm_89 / sm_90） 可使用 GPU
+        - 30 / 20 / 10 系等都可使用 GPU
+        """
+        if not torch.cuda.is_available():
+            print("[TTS] 未检测到 GPU，使用 CPU")
+            return "cpu"
+
+        try:
+            major, minor = torch.cuda.get_device_capability()
+            print(f"[TTS] 当前显卡 Compute Capability: {major}.{minor}")
+
+            # RTX 50 系（Blackwell 架构）= sm_120
+            if major >= 12:  
+                print("[TTS] 检测到 50 系显卡（sm_120），强制使用 CPU")
+                return "cpu"
+
+            # 其他情况全部用 GPU（包含 40 系 / 30 系 / 20 系）
+            print("[TTS] 使用 GPU")
+            return "cuda"
+
+        except Exception as e:
+            print("[TTS] 检测 GPU 架构失败，使用 CPU:", e)
+            return "cpu"
+
     def _get_wav_list(self, folder="source"):
         folder_path = Path(folder)
 
@@ -158,7 +187,7 @@ tts = TTSManager(mode="all", min_interval=0.5)
 
 # ========= 配置区域 =========
 # ROOM_ID = 242737   # TODO：改成你的斗鱼房间号
-ROOM_ID = 500269   # TODO：改成你的斗鱼房间号
+ROOM_ID = 12268074   # TODO：改成你的斗鱼房间号
 
 # OBS 浏览器叠加层的本地 WebSocket 服务
 OBS_WS_HOST = "127.0.0.1"

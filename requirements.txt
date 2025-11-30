@@ -1,8 +1,6 @@
 certifi==2025.11.12
 python_socks==2.7.3
 sounddevice==0.5.3
-torch==2.1.2
-torchaudio==2.1.2
 TTS==0.22.0
 websockets==15.0.1
 transformers>=4.36,<4.43
