@@ -1,0 +1,6 @@
+.vscode
+venv
+.DS_Store
+CosyVoice
+pretrained_models
+__pycache__
