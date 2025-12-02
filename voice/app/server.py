@@ -72,7 +72,7 @@ async def tts_zero_shot_json(req: TTSRequest):
         audio_bytes = ENGINE.tts_with_spk(
             tts_text=text,
             spk_id=FIXED_SPK_ID,
-            text_frontend=True,   # 你可以按听感改 True/False
+            text_frontend=False,   # 你可以按听感改 True/False
         )
     except Exception as e:
         print("[ERR] TTS failed:", repr(e))
