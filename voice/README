@@ -1,0 +1,11 @@
+# CosyVoice 模型服务
+
+## 准备工作
+
+[安装git](https://git-scm.com/install/)
+
+[安装git lfs](https://git-lfs.com/)
+
+```
+python init.py
+```
