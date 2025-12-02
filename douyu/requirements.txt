@@ -1,0 +1,6 @@
+certifi==2025.11.12
+python-socks==2.7.3
+websockets==15.0.1
+sounddevice
+soundfile
+requests
