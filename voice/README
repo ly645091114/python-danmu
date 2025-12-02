@@ -7,5 +7,13 @@
 [安装git lfs](https://git-lfs.com/)
 
 ```
+git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git
+
+mkdir -p pretrained_models
+
+git lfs install
+
+git clone https://www.modelscope.cn/iic/CosyVoice2-0.5B.git pretrained_models/CosyVoice2-0.5B
+
 python init.py
 ```
