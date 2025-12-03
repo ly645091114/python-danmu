@@ -133,9 +133,9 @@ def install_requirements():
     print("[INFO] 所有依赖安装完成。")
 
 
-def run_douyu_script():
+def run_main():
     py_path = venv_python()
-    script_path = PROJECT_DIR / "douyu_obs_overlay.py"
+    script_path = PROJECT_DIR / "main.py"
 
     if not script_path.exists():
         print(f"[ERROR] 找不到脚本: {script_path}")
@@ -162,7 +162,7 @@ def main():
     print(f"[INFO] 项目目录: {PROJECT_DIR}")
     ensure_venv()
     install_requirements()
-    run_douyu_script()
+    run_main()
 
 
 if __name__ == "__main__":
