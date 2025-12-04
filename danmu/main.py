@@ -1,22 +1,25 @@
 # main.py
 import asyncio
-
-from config import (
-    PLATFORM,
-    ROOM_ID,
-    OBS_WS_HOST,
-    OBS_WS_PORT,
-    USE_SOCKS_PROXY,
-    TTS_API_URL,
-)
 from app.tts_manager import TTSManager
 from app.obs_overlay import start_overlay_server, broadcast_to_overlay
 
 # 平台实现
 from live_platform.douyu import connect_douyu
+from live_platform.huya import DanmakuClient
 # 以后可以:
 # from platform.huya_client import connect_huya
 # from platform.bilibili_client import connect_bili
+
+from app.utils import load_config_txt
+
+config = load_config_txt("config.txt")
+
+PLATFORM = config.get("PLATFORM", "douyu")
+ROOM_ID = config.get("ROOM_ID", 242737)
+TTS_API_URL = config.get("TTS_API_URL", "http://127.0.0.1:9522/tts")
+USE_SOCKS_PROXY = config.get("USE_SOCKS_PROXY", False)
+OBS_WS_HOST = config.get("OBS_WS_HOST", "127.0.0.1")
+OBS_WS_PORT = config.get("OBS_WS_PORT", 8765)
 
 
 async def main():
@@ -36,14 +39,10 @@ async def main():
                 use_socks_proxy=USE_SOCKS_PROXY,
             )
         )
-    # elif PLATFORM == "huya":
-    #     asyncio.create_task(
-    #         connect_huya(
-    #             room_id=HUYA_ROOM_ID,
-    #             tts=tts,
-    #             broadcast=broadcast_to_overlay,
-    #         )
-    #     )
+    elif PLATFORM == "huya":
+        client = DanmakuClient(url=f"https://www.huya.com/{ROOM_ID}")
+        client.start()
+        # asyncio.create_task(client.start())
     else:
         raise ValueError(f"未知平台: {PLATFORM}")
 
