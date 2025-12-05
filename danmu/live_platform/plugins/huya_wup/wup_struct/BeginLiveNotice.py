@@ -13,8 +13,8 @@ class HuyaBeginLiveNotice(tarscore.struct):
         self.sGameName: tarscore.string = ""
         self.iRandomRange: tarscore.int32 = 0
         self.iStreamType: tarscore.int32 = 0
-        self.vStreamInfo: tarscore.vector = tarscore.vector(HuyaStreamInfo) # FIXME
-        self.vCdnList: tarscore.vector = tarscore.vector(tarscore.string) # FIXME
+        self.vStreamInfo: tarscore.vctclass = tarscore.vctclass(HuyaStreamInfo) # FIXME
+        self.vCdnList: tarscore.vctclass = tarscore.vctclass(tarscore.string) # FIXME
         self.lLiveId: tarscore.int64 = 0
         self.iPCDefaultBitRate: tarscore.int32 = 0
         self.iWebDefaultBitRate: tarscore.int32 = 0
@@ -25,7 +25,7 @@ class HuyaBeginLiveNotice(tarscore.struct):
         self.lAttendeeCount: tarscore.int64 = 0
         self.iCodecType: tarscore.int32 = 0
         self.iScreenType: tarscore.int32 = 0
-        self.vMultiStreamInfo: tarscore.vector = tarscore.vector(HuyaMultiStreamInfo) # FIXME
+        self.vMultiStreamInfo: tarscore.vctclass = tarscore.vctclass(HuyaMultiStreamInfo) # FIXME
         self.sLiveDesc: tarscore.string = ""
         self.lLiveCompatibleFlag: tarscore.int64 = 0
         self.sAvatarUrl: tarscore.string = ""
@@ -44,8 +44,8 @@ class HuyaBeginLiveNotice(tarscore.struct):
         oos.write(tarscore.string, 2, value.sGameName)
         oos.write(tarscore.int32, 3, value.iRandomRange)
         oos.write(tarscore.int32, 4, value.iStreamType)
-        oos.write(tarscore.vector, 5, value.vStreamInfo)
-        oos.write(tarscore.vector, 6, value.vCdnList)
+        oos.write(tarscore.vctclass, 5, value.vStreamInfo)
+        oos.write(tarscore.vctclass, 6, value.vCdnList)
         oos.write(tarscore.int64, 7, value.lLiveId)
         oos.write(tarscore.int32, 8, value.iPCDefaultBitRate)
         oos.write(tarscore.int32, 9, value.iWebDefaultBitRate)
@@ -56,7 +56,7 @@ class HuyaBeginLiveNotice(tarscore.struct):
         oos.write(tarscore.int64, 14, value.lAttendeeCount)
         oos.write(tarscore.int32, 15, value.iCodecType)
         oos.write(tarscore.int32, 16, value.iScreenType)
-        oos.write(tarscore.vector, 17, value.vMultiStreamInfo)
+        oos.write(tarscore.vctclass, 17, value.vMultiStreamInfo)
         oos.write(tarscore.string, 18, value.sLiveDesc)
         oos.write(tarscore.int64, 19, value.lLiveCompatibleFlag)
         oos.write(tarscore.string, 20, value.sAvatarUrl)

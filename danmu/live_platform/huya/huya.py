@@ -68,13 +68,15 @@ class Huya:
         content = ""
         msgs = []
         ios = tarscore.TarsInputStream(data)
+        print(ios)
         if ios.read(tarscore.int32, 0, False) == 7:
             ios = tarscore.TarsInputStream(ios.read(tarscore.bytes, 1, False))
-            if ios.read(tarscore.int64, 1, False) == 1400:
+            msgType = ios.read(tarscore.int64, 1, False)
+            if msgType == 1400:
                 ios = tarscore.TarsInputStream(ios.read(tarscore.bytes, 2, False))
                 name = ios.read(User, 0, False)  # username
                 content = ios.read(tarscore.string, 3, False).decode("utf8")  # content
-            elif ios.read(tarscore.int64, 1, False) == 6501:
+            elif msgType == 6501:
                 ios = tarscore.TarsInputStream(ios.read(tarscore.bytes, 2, False))
                 name = ios.read(User, 0, False)  # username
                 content = ios.read(tarscore.string, 3, False).decode("utf8")  # content
@@ -82,5 +84,5 @@ class Huya:
 
         if name != "":
             msg = {"name": name, "content": content}
-            print(msg)
+            # print(msg)
         return msgs

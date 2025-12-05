@@ -59,6 +59,46 @@ class DataHead:
             helper = (0xF0 | vtype) << 8 | tag
             buff.writeBuf(struct.pack('!H', helper))
 
+class Vector:
+    def __init__(self, proto):
+        self.proto = proto
+        self.value = []
+
+    def _clone(self):
+        return Vector(self.proto)
+
+    def _write(self, os, tag, val=None):
+        if val is None:
+            val = self.value
+
+        os.__writeVector(tag, val, self.proto)
+
+    def _read(self, is_, tag, default=None):
+        if default is None:
+            default = self.value
+
+        result = is_.__readVector(tag, True, self.proto)
+        self.value = result
+        return result
+
+    def _className(self):
+        elem_name = getattr(self.proto, "_className", lambda: str(self.proto))()
+        return f"vector<{elem_name}>"
+
+    def append(self, item):
+        self.value.append(item)
+
+    def __iter__(self):
+        return iter(self.value)
+
+    def __len__(self):
+        return len(self.value)
+
+    def __getitem__(self, index):
+        return self.value[index]
+
+    def __repr__(self):
+        return f"Vector({self.value})"
 
 class TarsOutputStream(object):
     def __init__(self):
