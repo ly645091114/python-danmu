@@ -1,5 +1,3 @@
-from live_platform.plugins.huya_wup.wup_struct.StreamerNode import HuyaStreamerNode
-from live_platform.plugins.huya_wup.wup_struct.UserIdentityInfo import HuyaUserIdentityInfo
 from live_platform.common.tars import tarscore
 
 class HuyaSendItemNoticeWordBroadcastPacket(tarscore.struct):

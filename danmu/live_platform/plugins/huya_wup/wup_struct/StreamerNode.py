@@ -1,4 +1,3 @@
-from live_platform.plugins.huya_wup.wup_struct.DecorationInfo import HuyaDecorationInfo
 from live_platform.common.tars import tarscore
 
 class HuyaStreamerNode(tarscore.struct):

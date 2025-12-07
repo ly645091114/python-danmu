@@ -1,11 +1,12 @@
-from live_platform.plugins.huya_wup.wup_struct import UserId
+
+from live_platform.plugins.huya_wup.wup_struct.UserId import HuyaUserId
 from live_platform.common.tars import tarscore
 
 class HuyaGetPropsListReq(tarscore.struct):
     __tars_class__ = "Huya.GetPropsListReq"
 
     def __init__(self):
-        self.tUserId: tarscore.struct = UserId()
+        self.tUserId: tarscore.struct = HuyaUserId()
         self.sMd5: tarscore.string = ""
         self.iTemplateType: tarscore.int32 = 64
         self.sVersion: tarscore.string = ""

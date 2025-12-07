@@ -212,6 +212,9 @@ class TarsOutputStream(object):
 
     def getBuffer(self):
         return self.__buffer.getBuffer()
+    
+    def getBinBuffer(self):
+        return self.__buffer
 
     def printHex(self):
         util.printHex(self.__buffer.getBuffer())

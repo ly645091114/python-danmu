@@ -1,7 +1,9 @@
+import re
 import ssl
 import aiohttp
 import certifi
-from live_platform.plugins import random_user_agent
+from live_platform.plugins.huya_wup.wup_struct.WSRegisterGroupReq import HuyaWSRegisterGroupReq
+from live_platform.plugins.huya_wup.wup_struct.WSPushMessage import HuyaWSPushMessage
 
 from live_platform.common.tars import tarscore
 from live_platform.plugins import match1
@@ -20,7 +22,7 @@ class Huya:
     heartbeatInterval = 60
     # 等待统一ua后修改
     headers = {
-        'user-agent': random_user_agent(),
+        'user-agent': "'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1 Edg/91.0.4472.124'",
     }
 
     @staticmethod
@@ -35,27 +37,41 @@ class Huya:
             ssl_context.options |= ssl.OP_NO_TLSv1_1
             ssl_context.set_ciphers("DEFAULT")
     
-            async with session.get(f'https://www.huya.com/{room_id}', ssl_context=ssl_context, headers=Huya.headers, timeout=5) as resp:
+            async with session.get(f'https://m.huya.com/{room_id}', ssl_context=ssl_context, headers=Huya.headers, timeout=60 *  1000) as resp:
                 room_page = await resp.text()
-                uid = int(match1(room_page, r"uid\":\"?(\d+)\"?"))
-
-        ws_user_info = HuyaWSUserInfo()
-        ws_user_info.iUid = uid
-        ws_user_info.bAnonymous = False
-        ws_user_info.lGroupId = uid
-        ws_user_info.lGroupType = 3
-        oos = tarscore.TarsOutputStream()
-        ws_user_info.writeTo(oos, ws_user_info)
+        
+        def pick(pattern: str) -> int:
+            m = re.search(pattern, room_page)
+            if not m or m.group(1) == "":
+                return 0
+            return int(m.group(1))
+        
+        uid = int(pick(r'"lUid":(.*?),"iIsProfile"'))
+        print(uid)
+        req = HuyaWSRegisterGroupReq()
+        req.vGroupId.append(f"live:{uid}")
+        req.vGroupId.append(f"chat:{uid}")
+        stream = tarscore.TarsOutputStream()
+        req.writeTo(stream)
+        # ws_user_info = HuyaWSUserInfo()
+        # ws_user_info.iUid = uid
+        # ws_user_info.bAnonymous = False
+        # ws_user_info.lGroupId = uid
+        # ws_user_info.lGroupType = 3
+        # oos = tarscore.TarsOutputStream()
+        # ws_user_info.writeTo(oos, ws_user_info)
 
         ws_cmd = HuyaWebSocketCommand()
-        ws_cmd.iCmdType = EWebSocketCommandType.EWSCmd_RegisterReq
-        ws_cmd.vData = oos.getBuffer()
-        oos = tarscore.TarsOutputStream()
-        ws_cmd.writeTo(oos, ws_cmd)
+        ws_cmd.iCmdType = EWebSocketCommandType.EWSCmdC2S_RegisterGroupReq
+        ws_cmd.vData = stream.getBinBuffer()
+        print(ws_cmd.vData)
+        stream = tarscore.TarsOutputStream()
+        ws_cmd.writeTo(stream)
 
-        reg_datas.append(oos.getBuffer())
+        reg_datas.append(stream.getBuffer())
 
         return Huya.wss_url, reg_datas
+    
 
     @staticmethod
     def decode_msg(data):
@@ -63,24 +79,20 @@ class Huya:
             @staticmethod
             def readFrom(ios):
                 return ios.read(tarscore.string, 2, False).decode("utf8")
-
+        ios = tarscore.TarsInputStream(data)
         name = ""
         content = ""
         msgs = []
-        ios = tarscore.TarsInputStream(data)
-        print(ios)
-        if ios.read(tarscore.int32, 0, False) == 7:
-            ios = tarscore.TarsInputStream(ios.read(tarscore.bytes, 1, False))
-            msgType = ios.read(tarscore.int64, 1, False)
-            if msgType == 1400:
+        iCmdType = ios.read(tarscore.int32, 0, False)
+        print(iCmdType)
+        vData = ios.read(tarscore.bytes, 1, False)
+        if iCmdType == 7:
+            ios = tarscore.TarsInputStream(vData)
+            iUri = ios.read(tarscore.int64, 1, False)
+            if iUri == 1400:
                 ios = tarscore.TarsInputStream(ios.read(tarscore.bytes, 2, False))
                 name = ios.read(User, 0, False)  # username
                 content = ios.read(tarscore.string, 3, False).decode("utf8")  # content
-            elif msgType == 6501:
-                ios = tarscore.TarsInputStream(ios.read(tarscore.bytes, 2, False))
-                name = ios.read(User, 0, False)  # username
-                content = ios.read(tarscore.string, 3, False).decode("utf8")  # content
-                print(ios)
 
         if name != "":
             msg = {"name": name, "content": content}

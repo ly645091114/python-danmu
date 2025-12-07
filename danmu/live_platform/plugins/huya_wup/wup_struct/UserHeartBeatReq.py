@@ -1,11 +1,12 @@
-from live_platform.plugins.huya_wup.wup_struct import EStreamLineType, UserId
+from live_platform.plugins.huya_wup.wup_struct.UserId import HuyaUserId
+from live_platform.plugins.huya_wup.wup_struct import EStreamLineType
 from live_platform.common.tars import tarscore
 
 class HuyaUserHeartBeatReq(tarscore.struct):
     __tars_class__ = "Huya.UserHeartBeatReq"
 
     def __init__(self):
-        self.tId: tarscore.struct = UserId()
+        self.tId: tarscore.struct = HuyaUserId
         self.lTid: tarscore.int64 = 0
         self.lSid: tarscore.int64 = 0
         self.lPid: tarscore.int64 = 0

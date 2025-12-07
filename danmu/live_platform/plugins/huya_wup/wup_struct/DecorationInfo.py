@@ -1,4 +1,3 @@
-from live_platform.plugins.huya_wup.wup_struct.BulletBorderGroundFormat import HuyaBulletBorderGroundFormat
 from live_platform.common.tars import tarscore
 
 class HuyaDecorationInfo(tarscore.struct):

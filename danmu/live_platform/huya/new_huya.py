@@ -1,11 +1,14 @@
 import asyncio
 import re
 import ssl
+import time
 from typing import Dict, Any
 
 import aiohttp
 import certifi
 
+from live_platform.plugins.huya_wup.wup_struct.WSPushMessage import HuyaWSPushMessage
+from live_platform.plugins.huya_wup.wup_struct import TafMx
 from live_platform.plugins.huya_wup.wup_struct.UserHeartBeatReq import HuyaUserHeartBeatReq
 from live_platform.plugins.huya_wup.wup_struct.GetPropsListReq import HuyaGetPropsListReq
 from live_platform.plugins.huya_wup.wup_struct.WSRegisterGroupReq import HuyaWSRegisterGroupReq
@@ -26,6 +29,7 @@ class HuyaDanmuClient:
             "Mobile/15E148 Safari/604.1"
         )
         self.timeout = timeout
+        self.wss_url = 'wss://cdnws.api.huya.com/'
 
         self.http: aiohttp.ClientSession | None = None
         self.ws: aiohttp.ClientWebSocketResponse | None = None
@@ -92,9 +96,9 @@ class HuyaDanmuClient:
 
     def _encode_wup(self, servant: str, func: str, req_struct) -> bytes:
         wup = Wup()
-        wup.servant(servant)
-        wup.func(func)
-        wup_bytes = wup.encode()
+        wup.servant = servant
+        wup.func = func
+        wup_bytes = wup.encode_v3()
 
         web_cmd = HuyaWebSocketCommand()
         web_cmd.iCmdType = EWebSocketCommandType.EWSCmd_WupReq
@@ -136,6 +140,7 @@ class HuyaDanmuClient:
 
     async def _send_heartbeat(self):
         hb = HuyaUserHeartBeatReq()
+        print(self.user_id, self.room_info)
         hb.tId = self.user_id
         hb.lTid = self.room_info["lChannelId"]
         hb.lSid = self.room_info["lSubChannelId"]
@@ -165,10 +170,9 @@ class HuyaDanmuClient:
                 break
 
     async def _handle_binary(self, data: bytes):
-        # 伪代码：按你自己的 tars 解码方式来写
         ios = tarscore.TarsInputStream(data)
         cmd = HuyaWebSocketCommand()
-        cmd.readFrom(ios, cmd)
+        cmd.readFrom(ios)
 
         if cmd.iCmdType == EWebSocketCommandType.EWSCmd_WupRsp:
             await self._handle_wup_response(cmd.vData)
@@ -196,10 +200,8 @@ class HuyaDanmuClient:
             #         mapping_cls = TafMx.WupMapping[func_name]
             #         rsp_obj = mapping_cls()
 
-            #         # JS: wup.readStruct("tRsp", map, TafMx.WupMapping[wup.sFuncName]);
             #         wup.readStruct("tRsp", rsp_obj, mapping_cls)
 
-            #         # JS: this.emit(wup.sFuncName, map);
             #         self.emit(func_name, rsp_obj)
 
             #     except Exception as e:
@@ -208,14 +210,13 @@ class HuyaDanmuClient:
             # 2) 系统推送（MsgPush）
             if cmd_type == EWebSocketCommandType.EWSCmdS2C_MsgPushReq:
                 from_stream = tarscore.TarsInputStream(web_cmd.vData)
-                push_msg = HUYA.WSPushMessage()
+                push_msg = HuyaWSPushMessage()
                 push_msg.readFrom(from_stream)
 
                 mcs = push_msg.iUri
 
                 inner_stream = tarscore.TarsInputStream(push_msg.sMsg)
 
-                # JS: var uriMapping = TafMx.UriMapping[pushMessage.iUri];
                 uri_cls = TafMx.UriMapping.get(mcs)
                 if uri_cls:
                     msg = uri_cls()
@@ -223,29 +224,41 @@ class HuyaDanmuClient:
 
                     # 弹幕：mcs == 1400
                     if mcs == 1400:
-                        # JS:
-                        # this.emit("onChat", {
-                        #   room_id: this.config.roomid,
-                        #   timestamp: new Date().getTime() + "",
-                        #   uid: msg.tUserInfo.lUid + "",
-                        #   nickName: msg.tUserInfo.sNickName,
-                        #   txt: msg.sContent,
-                        # });
-                        self.emit("onChat", {
-                            "room_id": self.config.roomid,
+                        print({
+                            "room_id": self.room_id,
                             "timestamp": str(int(time.time() * 1000)),
                             "uid": str(msg.tUserInfo.lUid),
                             "nickName": msg.tUserInfo.sNickName,
                             "txt": msg.sContent,
                         })
+                        # self.emit("onChat", {
+                        #     "room_id": self.room_id,
+                        #     "timestamp": str(int(time.time() * 1000)),
+                        #     "uid": str(msg.tUserInfo.lUid),
+                        #     "nickName": msg.tUserInfo.sNickName,
+                        #     "txt": msg.sContent,
+                        # })
 
-                    # 礼物：mcs in [6501, 6502, 6507]
                     if mcs in (6501, 6502, 6507):
-                        # JS: let gift = this._gift_info[msg.iItemType + ""] || { price: 0 };
                         gift = self._gift_info.get(str(msg.iItemType), {"price": 0, "name": "", "icon": ""})
+                        print({
+                            "room_id": self.room_id,
+                            "timestamp": str(int(time.time() * 1000)),
+                            "uid": str(msg.lSenderUid),
+                            "nickName": msg.sSenderNick,
+                            "type": mcs,
+                            "gfid": msg.iItemType,
+                            "gfcnt": msg.iItemCount,
+                            "sExpand": msg.sExpand,
+                            "gift_name": gift.get("name", ""),
+                            "gift_icon": gift.get("icon", ""),
+                            "price_big": gift.get("price", 0),
+                            "price_total": msg.iItemCount * gift.get("price", 0),
+
+                        })
 
                         self.emit("onGift", {
-                            "room_id": self.config.roomid,
+                            "room_id": self.room_id,
                             "timestamp": str(int(time.time() * 1000)),
                             "uid": str(msg.lSenderUid),
                             "nickName": msg.sSenderNick,
@@ -257,13 +270,10 @@ class HuyaDanmuClient:
                             "price_big": gift.get("price", 0),
                             "price_total": msg.iItemCount * gift.get("price", 0),
                         })
-
-            # 其他类型：忽略
             else:
                 pass
 
         except Exception as e:
-            # JS: this.emit("onError", { type: 1, error: e });
             self.emit("onError", {
                 "type": 1,
                 "error": e,
@@ -282,9 +292,6 @@ class HuyaDanmuClient:
     # ------------ 对外启动 ------------
 
     async def start(self):
-        """
-        总控：HTTP -> 构造 user -> 建 WS -> 注册 -> 拉礼物 -> 心跳 + 收消息
-        """
         self._running = True
 
         ssl_context = ssl.create_default_context(cafile=certifi.where())
@@ -302,7 +309,7 @@ class HuyaDanmuClient:
 
             # 3. 建立 WebSocket 连接
             async with self.http.ws_connect(
-                HUYA.wss_url,  # 你原来 get_ws_info 里的 wss url
+                self.wss_url,
                 ssl=ssl_context,
             ) as self.ws:
                 # 4. 发送 RegisterReq

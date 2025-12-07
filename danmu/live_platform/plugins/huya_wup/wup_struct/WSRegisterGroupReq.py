@@ -1,20 +1,19 @@
 from live_platform.common.tars import tarscore
-from live_platform.common.tars.__util import util
 
-class HuyaWSRegisterGroupReq(tarscore.struct):
+class HuyaWSRegisterGroupReq:
     __tars_class__ = "Huya.WSRegisterGroupReq"
 
     def __init__(self):
-        self.vGroupId = tarscore.vctclass = tarscore.vctclass(tarscore.string)
-        self.sToken = ""
+        VecStr = tarscore.vctclass(tarscore.string)
+        self.vGroupId = VecStr()
+        self.sToken: tarscore.string = ""
 
-    @staticmethod
-    def writeTo(oos: tarscore.TarsOutputStream, value):
-        oos.write(tarscore.vctclass, 0, value.vGroupId)
-        oos.write(tarscore.string, 1, value.sToken)
+    def writeTo(self, oos: tarscore.TarsOutputStream):
+        VecStr = tarscore.vctclass(tarscore.string)
+        oos.write(VecStr(), 0, self.vGroupId)
+        oos.write(tarscore.string, 1, self.sToken)
 
-    @staticmethod
-    def readFrom(ios: tarscore.TarsInputStream):
-        value = HuyaWSRegisterGroupReq()
-        value.vGroupId = ios.read(tarscore.vctclass, 0, False)
-        value.sToken = ios.read(tarscore.string, 1, False)
+    def readFrom(self, ios: tarscore.TarsInputStream):
+        VecStr = tarscore.vctclass(tarscore.string)
+        self.vGroupId = ios.read(VecStr(), 0, False)
+        self.sToken = ios.read(tarscore.string, 1, False)
