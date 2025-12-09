@@ -10,10 +10,10 @@ class HuyaBulletFormat(tarscore.struct):
         self.iTextSpeed: tarscore.int32 = 0
         self.iTransitionType: tarscore.int32 = 1
         self.iPopupStyle: tarscore.int32 = 0
-        self.tBorderGroundFormat: tarscore.struct = HuyaBulletBorderGroundFormat()
+        self.tBorderGroundFormat = HuyaBulletBorderGroundFormat()
 
     @staticmethod
-    def writeTo(oos: tarscore.TarsOutputStream, value):
+    def writeTo(oos: tarscore.TarsOutputStream, value: "HuyaBulletFormat"):
         oos.write(tarscore.int32, 0, value.iFontColor)
         oos.write(tarscore.int32, 1, value.iFontSize)
         oos.write(tarscore.int32, 2, value.iTextSpeed)
@@ -29,4 +29,5 @@ class HuyaBulletFormat(tarscore.struct):
         value.iTextSpeed = ios.read(tarscore.int32, 2, False)
         value.iTransitionType = ios.read(tarscore.int32, 3, False)
         value.iPopupStyle = ios.read(tarscore.int32, 4, False)
-        value.tBorderGroundFormat = ios.read(tarscore.struct, 5, False)
+        value.tBorderGroundFormat = ios.read(HuyaBulletBorderGroundFormat, 5, False)
+        return value

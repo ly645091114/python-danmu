@@ -9,7 +9,7 @@ class HuyaContentFormat(tarscore.struct):
         self.iPopupStyle: tarscore.string = 0
 
     @staticmethod
-    def writeTo(oos: tarscore.TarsOutputStream, value):
+    def writeTo(oos: tarscore.TarsOutputStream, value: "HuyaContentFormat"):
         oos.write(tarscore.int32, 0, value.iFontColor)
         oos.write(tarscore.int32, 1, value.iFontSize)
         oos.write(tarscore.int32, 2, value.iPopupStyle)
@@ -20,3 +20,4 @@ class HuyaContentFormat(tarscore.struct):
         value.iFontColor = ios.read(tarscore.int32, 0, False)
         value.iFontSize = ios.read(tarscore.int32, 1, False)
         value.iPopupStyle = ios.read(tarscore.int32, 2, False)
+        return value

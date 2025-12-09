@@ -66,13 +66,12 @@ class Wup(TarsUniPacket):
     def encode_v3(self):
         oos = TarsOutputStream()
         oos.write(self.__mapa, 0, self.__new_buffer)
-
         self.__code.iVersion = 3 # Force to use TarsV3
         self.__code.sBuffer = oos.getBuffer()
 
         sos = TarsOutputStream()
-        RequestPacket.writeTo(sos, self.__code)
-
+        self.__code.writeTo(sos, self.__code)
+        
         return struct.pack('!i', 4 + len(sos.getBuffer())) + sos.getBuffer()
 
     def decode_v3(self, buf):

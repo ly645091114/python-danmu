@@ -1,6 +1,6 @@
 from live_platform.common.tars import tarscore
 
-class HuyaSendItemNoticeWordBroadcastPacket(tarscore.struct):
+class HuyaSendItemNoticeWordBroadcastPacket:
     __tars_class__ = "Huya.SendItemNoticeWordBroadcastPacket"
 
     def __init__(self):
@@ -26,7 +26,7 @@ class HuyaSendItemNoticeWordBroadcastPacket(tarscore.struct):
         self.lRoomId: tarscore.int64 = 0
 
     @staticmethod
-    def writeTo(oos: tarscore.TarsOutputStream, value):
+    def writeTo(oos: tarscore.TarsOutputStream, value: "HuyaSendItemNoticeWordBroadcastPacket"):
         oos.write(tarscore.int32, 0, value.iItemType)
         oos.write(tarscore.int32, 1, value.iItemCount)
         oos.write(tarscore.int64, 2, value.lSenderSid)
@@ -71,3 +71,4 @@ class HuyaSendItemNoticeWordBroadcastPacket(tarscore.struct):
         value.lSid = ios.read(tarscore.int64, 17, False)
         value.lSubSid = ios.read(tarscore.int64, 18, False)
         value.lRoomId = ios.read(tarscore.int64, 19, False)
+        return value

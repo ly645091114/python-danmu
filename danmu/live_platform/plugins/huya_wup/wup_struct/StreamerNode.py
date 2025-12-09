@@ -9,7 +9,7 @@ class HuyaStreamerNode(tarscore.struct):
         self.iMaterialType: tarscore.int16  = 0
 
     @staticmethod
-    def writeTo(oos: tarscore.TarsOutputStream, value):
+    def writeTo(oos: tarscore.TarsOutputStream, value: "HuyaStreamerNode"):
         oos.write(tarscore.int16, 0, value.iGiftLevel)
         oos.write(tarscore.int16, 1, value.iStreamerLevel)
         oos.write(tarscore.int16, 2, value.iMaterialType)
@@ -20,3 +20,4 @@ class HuyaStreamerNode(tarscore.struct):
         value.iGiftLevel = ios.read(tarscore.int16, 0, False)
         value.iStreamerLevel = ios.read(tarscore.int16, 1, False)
         value.iMaterialType = ios.read(tarscore.int16, 2, False)
+        return value

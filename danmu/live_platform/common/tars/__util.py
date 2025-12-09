@@ -41,6 +41,12 @@ class util:
     def mapclass(ktype, vtype):
         class mapklass(dict):
             def size(self): return len(self)
+
+            def hasKey(self, key):
+                return key in self
+            
+            def put(self, key, value):
+                self[key] = value
         setattr(mapklass, '__tars_index__', 8)
         setattr(mapklass, '__tars_class__', "map<" +
                 ktype.__tars_class__ + "," + vtype.__tars_class__ + ">")

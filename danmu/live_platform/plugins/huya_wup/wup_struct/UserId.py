@@ -10,26 +10,23 @@ class HuyaUserId(tarscore.struct):
         self.sToken: tarscore.string = ""
         self.sHuYaUA: tarscore.string = ""
         self.sCookie: tarscore.string = ""
+        self.iTokenType: tarscore.int32 = 0
 
     @staticmethod
-    def writeTo(oos: tarscore.TarsOutputStream, value):
+    def writeTo(oos: tarscore.TarsOutputStream, value: "HuyaUserId"):
         oos.write(tarscore.int64, 0, value.lUid)
         oos.write(tarscore.string, 1, value.sGuid)
         oos.write(tarscore.string, 2, value.sToken)
         oos.write(tarscore.string, 3, value.sHuYaUA)
         oos.write(tarscore.string, 4, value.sCookie)
+        oos.write(tarscore.int32, 5, value.iTokenType)
 
     @staticmethod
     def readFrom(ios: tarscore.TarsInputStream):
         value = HuyaUserId()
         value.lUid = ios.read(tarscore.int64, 0, False)
-        # print(("lUid = %d" % value.lUid))
         value.sGuid = ios.read(tarscore.string, 1, False)
-        # print(("sGuid = %s" % value.sGuid))
         value.sToken = ios.read(tarscore.string, 2, False)
-        # print(("sToken = %s" % value.sToken))
         value.sHuYaUA = ios.read(tarscore.string, 3, False)
-        # print(("sHuYaUA = %s" % value.sHuYaUA))
         value.sCookie = ios.read(tarscore.string, 4, False)
-        # print(("sCookie = %s" % value.sCookie))
-        return value
+        value.iTokenType = ios.read(tarscore.int32, 5, False)

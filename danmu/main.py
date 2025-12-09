@@ -1,11 +1,11 @@
 # main.py
 import asyncio
 from app.tts_manager import TTSManager
-from app.obs_overlay import start_overlay_server, broadcast_to_overlay
+from app.obs_overlay import broadcast_to_overlay
 
 # 平台实现
 from live_platform.douyu import connect_douyu
-from live_platform.huya import DanmakuClient
+from live_platform.huya.huya import Huya
 # 以后可以:
 # from platform.huya_client import connect_huya
 # from platform.bilibili_client import connect_bili
@@ -40,9 +40,9 @@ async def main():
             )
         )
     elif PLATFORM == "huya":
-        client = DanmakuClient(url=f"https://www.huya.com/{ROOM_ID}")
-        client.start()
-        # asyncio.create_task(client.start())
+        client = Huya(room_Id=ROOM_ID)
+        # client.start()
+        asyncio.create_task(client.start())
     else:
         raise ValueError(f"未知平台: {PLATFORM}")
 

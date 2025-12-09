@@ -8,7 +8,7 @@ class HuyaUidNickName(tarscore.struct):
         self.sNickName: tarscore.string = ""
 
     @staticmethod
-    def writeTo(oos: tarscore.TarsOutputStream, value):
+    def writeTo(oos: tarscore.TarsOutputStream, value: "HuyaUidNickName"):
         oos.write(tarscore.int64, 0, value.lUid)
         oos.write(tarscore.string, 1, value.sNickName)
 
@@ -17,3 +17,4 @@ class HuyaUidNickName(tarscore.struct):
         value = HuyaUidNickName()
         value.lUid = ios.read(tarscore.int64, 0, False)
         value.sNickName = ios.read(tarscore.string, 1, False)
+        return value

@@ -12,7 +12,7 @@ class HuyaSenderInfo(tarscore.struct):
         self.iNobleLevel: tarscore.int32 = 0
 
     @staticmethod
-    def writeTo(oos: tarscore.TarsOutputStream, value):
+    def writeTo(oos: tarscore.TarsOutputStream, value: "HuyaSenderInfo"):
         oos.write(tarscore.int64, 0, value.lUid)
         oos.write(tarscore.int64, 1, value.lImid)
         oos.write(tarscore.string, 2, value.sNickName)
@@ -29,3 +29,4 @@ class HuyaSenderInfo(tarscore.struct):
         value.iGender = ios.read(tarscore.int32, 3, False)
         value.sAvatarUrl = ios.read(tarscore.string, 4, False)
         value.iNobleLevel = ios.read(tarscore.int32, 5, False)
+        return value

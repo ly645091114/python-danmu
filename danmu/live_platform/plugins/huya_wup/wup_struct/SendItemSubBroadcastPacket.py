@@ -2,7 +2,7 @@ from live_platform.plugins.huya_wup.wup_struct.StreamerNode import HuyaStreamerN
 from live_platform.plugins.huya_wup.wup_struct.UserIdentityInfo import HuyaUserIdentityInfo
 from live_platform.common.tars import tarscore
 
-class HuyaSendItemSubBroadcastPacket(tarscore.struct):
+class HuyaSendItemSubBroadcastPacket:
     __tars_class__ = "Huya.SendItemSubBroadcastPacket"
 
     def __init__(self):
@@ -35,14 +35,13 @@ class HuyaSendItemSubBroadcastPacket(tarscore.struct):
         self.streamerInfo: tarscore.struct = HuyaStreamerNode()
 
     @staticmethod
-    def writeTo(oos: tarscore.TarsOutputStream, value):
+    def writeTo(oos: tarscore.TarsOutputStream, value: "HuyaSendItemSubBroadcastPacket"):
         oos.write(tarscore.int64, 0, value.iItemType)
         oos.write(tarscore.string, 1, value.strPayId)
         oos.write(tarscore.int32, 2, value.iItemCount)
         oos.write(tarscore.int64, 3, value.lPresenterUid)
         oos.write(tarscore.int64, 4, value.lSenderUid)
-        oos.write(tarscore.string, 5, value.sPresenterNick)
-        oos.write(tarscore.string, 6, value.sSenderNick)
+        oos.write(tarscore.string, 5, value.sSenderNick)
         oos.write(tarscore.string, 7, value.sSendContent)
         oos.write(tarscore.int32, 8, value.iItemCountByGroup)
         oos.write(tarscore.int32, 9, value.iItemGroup)
@@ -90,7 +89,8 @@ class HuyaSendItemSubBroadcastPacket(tarscore.struct):
         value.sPropsName = ios.read(tarscore.string, 20, False)
         value.iAccpet = ios.read(tarscore.int16, 21, False)
         value.iEventType = ios.read(tarscore.int64, 22, False)
-        value.userInfo = ios.read(tarscore.struct, 23, False)
+        value.userInfo = ios.read(HuyaUserIdentityInfo, 23, False)
         value.lRoomId = ios.read(tarscore.int64, 24, False)
         value.lHomeOwnerUid = ios.read(tarscore.int64, 25, False)
-        value.streamerInfo = ios.read(tarscore.struct, 26, False)
+        value.streamerInfo = ios.read(HuyaStreamerNode, 26, False)
+        return value

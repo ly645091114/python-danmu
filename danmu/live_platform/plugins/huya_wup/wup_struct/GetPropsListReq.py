@@ -17,7 +17,7 @@ class HuyaGetPropsListReq(tarscore.struct):
         self.iGameId: tarscore.int32 = 0
 
     @staticmethod
-    def writeTo(oos: tarscore.TarsOutputStream, value):
+    def writeTo(oos: tarscore.TarsOutputStream, value: "HuyaGetPropsListReq"):
         oos.write(tarscore.struct, 1, value.tUserId)
         oos.write(tarscore.string, 2, value.sMd5)
         oos.write(tarscore.int32, 3, value.iTemplateType)
@@ -40,3 +40,21 @@ class HuyaGetPropsListReq(tarscore.struct):
         value.lSid = ios.read(tarscore.int64, 7, False)
         value.lSubSid = ios.read(tarscore.int64, 8, False)
         value.iGameId = ios.read(tarscore.int32, 9, False)
+
+    def debug(self):
+        print("------- HuyaGetPropsListReq DEBUG -------")
+        print("tUserId:")
+        if hasattr(self.tUserId, "__dict__"):
+            for field, val in self.tUserId.__dict__.items():
+                print(f"   {field}: {val}")
+        else:
+            print("   <non-struct value>", self.tUserId)
+        print("sMd5:", self.sMd5)
+        print("iTemplateType:", int(self.iTemplateType))
+        print("sVersion:", self.sVersion)
+        print("iAppId:", self.iAppId)
+        print("lPresenterUid:", self.lPresenterUid)
+        print("lSid:", self.lSid)
+        print("lSubSid:", self.lSubSid)
+        print("iGameId:", self.iGameId)
+        print("--------------------------")

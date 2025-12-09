@@ -1,3 +1,5 @@
+from live_platform.plugins.huya_wup.wup_struct.UserHeartBeatRsp import HuyaUserHeartBeatRsp
+from live_platform.plugins.huya_wup.wup_struct.GetPropsListRsp import HuyaGetPropsListRsp
 from live_platform.plugins.huya_wup.wup_struct.SendItemNoticeGameBroadcastPacket import HuyaSendItemNoticeGameBroadcastPacket
 from live_platform.plugins.huya_wup.wup_struct.SendItemNoticeWordBroadcastPacket import HuyaSendItemNoticeWordBroadcastPacket
 from live_platform.plugins.huya_wup.wup_struct.SendItemSubBroadcastPacket import HuyaSendItemSubBroadcastPacket
@@ -5,6 +7,10 @@ from live_platform.plugins.huya_wup.wup_struct.MessageNotice import HuyaMessageN
 
 
 class TafMx:
+    WupMapping = {
+        'getPropsList': HuyaGetPropsListRsp,
+        'OnUserHeartBeat': HuyaUserHeartBeatRsp
+    }
     # iUri -> 消息结构类
     UriMapping = {
         1400: HuyaMessageNotice,

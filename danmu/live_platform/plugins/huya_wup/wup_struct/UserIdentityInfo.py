@@ -3,19 +3,21 @@ from live_platform.common.tars import tarscore
 
 class HuyaUserIdentityInfo(tarscore.struct):
     __tars_class__ = "Huya.UserIdentityInfo"
+    VctHuyaDecorationInfo = tarscore.vctclass(HuyaDecorationInfo)
 
     def __init__(self):
-        self.vDecorationPrefix: tarscore.vctclass = tarscore.vctclass(HuyaDecorationInfo)
-        self.vDecorationSuffix: tarscore.vctclass = tarscore.vctclass(HuyaDecorationInfo)
+        self.vDecorationPrefix = HuyaUserIdentityInfo.VctHuyaDecorationInfo()
+        self.vDecorationSuffix = HuyaUserIdentityInfo.VctHuyaDecorationInfo()
 
     @staticmethod
-    def writeTo(oos: tarscore.TarsOutputStream, value):
-        oos.write(tarscore.vctclass, 0, value.vDecorationPrefix)
-        oos.write(tarscore.vctclass, 1, value.vDecorationSuffix)
+    def writeTo(oos: tarscore.TarsOutputStream, value: "HuyaUserIdentityInfo"):
+        oos.write(HuyaUserIdentityInfo.VctHuyaDecorationInfo, 0, value.vDecorationPrefix)
+        oos.write(HuyaUserIdentityInfo.VctHuyaDecorationInfo, 1, value.vDecorationSuffix)
 
     @staticmethod
     def readFrom(ios: tarscore.TarsInputStream):
         value = HuyaUserIdentityInfo()
-        value.vDecorationPrefix = ios.read(tarscore.vctclass, 0, False)
-        value.vDecorationSuffix = ios.read(tarscore.vctclass, 1, False)
+        value.vDecorationPrefix = ios.read(HuyaUserIdentityInfo.VctHuyaDecorationInfo, 0, False)
+        value.vDecorationSuffix = ios.read(HuyaUserIdentityInfo.VctHuyaDecorationInfo, 1, False)
+        return value
 
