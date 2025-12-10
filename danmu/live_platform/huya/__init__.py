@@ -248,6 +248,7 @@ class Huya:
                         txt = msg.sContent.decode("utf8")
                         print(f"{nickName}说: {txt}")
                         self.tts.speak_normal(f"{nickName}说{txt}")
+
                     elif mcs == 6501:
                         gift = self._gift_info.get(str(msg.iItemType), {"price": 0})
                         nickName = msg.sSenderNick.decode("utf8"),
@@ -259,6 +260,7 @@ class Huya:
                             self.tts.speak_normal(f"{nickName}说{text}")
                         else:
                             print(f"[礼物] {nickName} 送出 {int(msg.iItemCount)} 个 {gift.get('name')}")
+
                     elif mcs in (6502, 6507):
                         gift = self._gift_info.get(str(msg.iItemType), {"price": 0})
                         print(f"[礼物] {nickName} 送出 {int(msg.iItemCount)} 个 {gift.get('name')}")
