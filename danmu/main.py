@@ -5,7 +5,7 @@ from app.obs_overlay import broadcast_to_overlay
 
 # 平台实现
 from live_platform.douyu import connect_douyu
-from live_platform.huya.huya import Huya
+from live_platform.huya import Huya
 # 以后可以:
 # from platform.huya_client import connect_huya
 # from platform.bilibili_client import connect_bili
@@ -20,7 +20,9 @@ TTS_API_URL = config.get("TTS_API_URL", "http://127.0.0.1:9522/tts")
 USE_SOCKS_PROXY = config.get("USE_SOCKS_PROXY", False)
 OBS_WS_HOST = config.get("OBS_WS_HOST", "127.0.0.1")
 OBS_WS_PORT = config.get("OBS_WS_PORT", 8765)
-
+MIN_PRICE=config.get("MIN_PRICE", 0)
+MAX_PRICE=config.get("MAX_PRICE", 10)
+SPEAK_TXT=config.get("SPEAK_TXT", "normal,highenergy").split(",")
 
 async def main():
     # 1. 初始化 TTS 管理器
@@ -40,7 +42,7 @@ async def main():
             )
         )
     elif PLATFORM == "huya":
-        client = Huya(room_Id=ROOM_ID)
+        client = Huya(room_Id=ROOM_ID, tts=tts, speak_txt=SPEAK_TXT)
         # client.start()
         asyncio.create_task(client.start())
     else:

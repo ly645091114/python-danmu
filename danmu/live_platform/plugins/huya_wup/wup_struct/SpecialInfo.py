@@ -63,4 +63,3 @@ class HuyaSpecialInfo(tarscore.struct):
         value.iOpenFaceu = ios.read(tarscore.int16, 16, False)
         value.iOpenGesture = ios.read(tarscore.int16, 17, False)
         return value
-

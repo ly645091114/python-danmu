@@ -1,201 +1,272 @@
-# 部分弹幕功能代码来自项目：https://github.com/IsoaSFlus/danmaku，感谢大佬
-# 快手弹幕代码来源及思路：https://github.com/py-wuhao/ks_barrage，感谢大佬
-# 部分斗鱼录播修复代码与思路来源于：https://github.com/SmallPeaches/DanmakuRender，感谢大佬
-# 仅抓取用户弹幕，不包括入场提醒、礼物赠送等。
-
-import asyncio
-import logging
-import certifi
 import re
 import ssl
-import threading
-from abc import ABC, abstractmethod
-from typing import Optional
-
 import aiohttp
-from live_platform.utils import setup_proxy_environment
-import lxml.etree as etree
+import certifi
+import websockets
+import asyncio
+from live_platform.plugins.huya_wup.wup import Wup
+from live_platform.plugins.huya_wup.wup_struct.TafMx import TafMx
+from app.tts_manager import TTSManager
 
-from live_platform.huya.huya import Huya
-
-logger = logging.getLogger('biliup')
-
-
-class IDanmakuClient(ABC):
-    @abstractmethod
-    def start(self):
-        pass
-
-    @abstractmethod
-    def stop(self):
-        pass
-
-    @abstractmethod
-    def save(self, file_name: Optional[str] = None):
-        pass
+from live_platform.common.tars import tarscore
+from live_platform.plugins.huya_wup.wup_struct.UserId import HuyaUserId
+from live_platform.plugins.huya_wup.wup_struct.GetPropsListReq import HuyaGetPropsListReq
+from live_platform.plugins.huya_wup.wup_struct import EClientTemplateType, EStreamLineType, EWebSocketCommandType
+from live_platform.plugins.huya_wup.wup_struct.WebSocketCommand import HuyaWebSocketCommand
+from live_platform.plugins.huya_wup.wup_struct.WSRegisterGroupReq import HuyaWSRegisterGroupReq
+from live_platform.plugins.huya_wup.wup_struct.UserHeartBeatReq import HuyaUserHeartBeatReq
+from live_platform.plugins.huya_wup.wup_struct.WSPushMessage import HuyaWSPushMessage
+from live_platform.plugins.huya_wup.wup_struct.OnTVUserReq import HuyaOnTVUserReq
 
 
-class DanmakuClient(IDanmakuClient):
-    class WebsocketErrorException(Exception):
-        pass
+class Huya:
+    
+    def __init__(
+            self,
+            room_Id,
+            sHuYaUA="webh5&1.0.0&huya",
+            sCookie="",
+            tts: TTSManager = None,
+            speak_txt = ["highenergy"],
+            min_price: int = 0,
+            max_price: int = 10,
+    ):
+        self.wss_url = 'wss://cdnws.api.huya.com/'
+        self.heartbeatInterval = 60
+        self.headers = {
+            'user-agent': "'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1 Edg/91.0.4472.124'",
+        }
+        self._client = None
+        self._heartbeat_task = None
+        self.room_Id = room_Id
+        self.info = None
+        self.timeout = 60
+        self.heartbeatTime = 60
+        self.sHuYaUA = sHuYaUA
+        self.cookies = sCookie
+        self._gift_info = {}
+        self.tts = tts
+        self.speak_txt = speak_txt
+        self.min_price = min_price
+        self.max_price = max_price
 
-    def __init__(self, url):
-        # TODO 录制任务产生的上下文信息 传递太麻烦了 需要改
-        self.__url = ''
-        self.__site = None
-        self.__hs = None
-        self.__ws = None
-        self.__dm_queue: Optional[asyncio.Queue] = None
-        self.__record_task: Optional[asyncio.Task] = None
-        self.__print_task: Optional[asyncio.Task] = None
 
-        if 'http://' == url[:7] or 'https://' == url[:8]:
-            self.__url = url
-        else:
-            self.__url = 'http://' + url
-        for u, s in {
-                     'huya.com': Huya,
-                     }.items():
-            if re.match(r'^(?:http[s]?://)?.*?%s/(.+?)$' % u, url):
-                self.__site = s
-                break
+    def _get_user_id(self):
+        user = HuyaUserId()
+        user.sHuYaUA = self.sHuYaUA
+        user.lUid = int(self.info["presenterUid"])
+        user.sCookie = self.cookies
+        user.sGuid = self.info.get("sGuid", "")
+        user.sToken = ""
+        return user
 
-        if self.__site is None:
-            # 抛出异常由外部处理 exit()会导致进程退出
-            raise Exception(f"{DanmakuClient.__name__}:{self.__url}: 不支持录制弹幕")
-
-    async def __init_ws(self):
-        setup_proxy_environment(False)
+    async def _get_room_info(self):
         try:
-            ws_url, reg_datas = await self.__site.get_ws_info(self.__url)
-            ssl_context = ssl.create_default_context(cafile=certifi.where())
-            ssl_context.options |= ssl.OP_NO_SSLv2
-            ssl_context.options |= ssl.OP_NO_SSLv3
-            ssl_context.options |= ssl.OP_NO_TLSv1
-            ssl_context.options |= ssl.OP_NO_TLSv1_1
-            ssl_context.set_ciphers("DEFAULT")
-            self.__ws = await self.__hs.ws_connect(ws_url, ssl_context=ssl_context, headers=getattr(self.__site, 'headers', {}))
-            for reg_data in reg_datas:
-                if type(reg_data) == str:
-                    await self.__ws.send_str(reg_data)
-                else:
-                    await self.__ws.send_bytes(reg_data)
-        except asyncio.CancelledError:
-            raise
-        except:
-            raise self.WebsocketErrorException()
+            async with aiohttp.ClientSession() as session:
+                ssl_context = ssl.create_default_context(cafile=certifi.where())
+                ssl_context.options |= ssl.OP_NO_SSLv2
+                ssl_context.options |= ssl.OP_NO_SSLv3
+                ssl_context.options |= ssl.OP_NO_TLSv1
+                ssl_context.options |= ssl.OP_NO_TLSv1_1
+                ssl_context.set_ciphers("DEFAULT")
+        
+                async with session.get(f'https://m.huya.com/{self.room_Id}', ssl_context=ssl_context, headers=self.headers, timeout=self.timeout *  1000) as resp:
+                    if resp.status != 200:
+                        raise RuntimeError(f"获取房间信息失败 status={resp.status}")
+                    room_page = await resp.text()
+            
+            def pick(pattern: str) -> int:
+                m = re.search(pattern, room_page)
+                if not m or m.group(1) == "":
+                    return 0
+                return int(m.group(1))
+            
+            info = {
+                "presenterUid": pick(r'"lUid":(.*?),"iIsProfile"'),
+                "yyuid": pick(r'"lYyid":(.*?),"sNick"'),
+                "lChannelId": pick(r'"lChannelId":(.*?),"lSubChannelId"'),
+                "lSubChannelId": pick(r'"lSubChannelId":(.*?),"lPresenterUid"'),
+                "sGuid": "",
+            }
+            
+            if not info["presenterUid"] or not info["yyuid"]:
+                return
+            if not info["lChannelId"]:
+                raise RuntimeError(f"房间 {self.room_Id} 不存在或已停播")
+            
+            return info
+        except Exception as e:
+            print("onError:", e)
+            return
 
-    async def __heartbeats(self):
-        if self.__site.heartbeat is not None:
-            while self.__site.heartbeat:
-                # 每隔这么长时间发送一次心跳包
-                await asyncio.sleep(self.__site.heartbeatInterval)
-                # 发送心跳包
-                if type(self.__site.heartbeat) == str:
-                    await self.__ws.send_str(self.__site.heartbeat)
-                else:
-                    await self.__ws.send_bytes(self.__site.heartbeat)
+    @staticmethod
+    async def get_ws_info(url):
+        room_id = url.split('huya.com/')[1].split('/')[0].split('?')[0]
+        room_info = await Huya._get_room_info(room_id)
+        return room_info
+    
+    def _get_gift(self):
+        prop_req = HuyaGetPropsListReq()
+        prop_req.tUserId = self._get_user_id()
+        prop_req.iTemplateType = EClientTemplateType.TPL_MIRROR
+        self.send_packet("PropsUIServer", "getPropsList", prop_req)
+    
+    def _get_chat(self):
+        req = HuyaWSRegisterGroupReq()
+        req.vGroupId.append(f'live:{self.info["presenterUid"]}')
+        req.vGroupId.append(f'chat:{self.info["presenterUid"]}')
+        stream = tarscore.TarsOutputStream()
+        req.writeTo(stream, req)
+        webCommand = HuyaWebSocketCommand()
+        webCommand.iCmdType = EWebSocketCommandType.EWSCmdC2S_RegisterGroupReq
+        webCommand.vData = stream.getBuffer()
+        stream = tarscore.TarsOutputStream()
+        webCommand.writeTo(stream, webCommand)
+        asyncio.create_task(self._sendMsg(stream.getBuffer()))
 
-    async def __fetch_danmaku(self):
+    def _get_on_tv_panel(self):
+        req = HuyaOnTVUserReq()
+        req.tUserId = self._get_user_id()
+        req.lPid = self.info["presenterUid"]
+        req.lTid = self.info["lChannelId"]
+        req.lSid = self.info["lSubChannelId"]
+        req.iSupportFlag = 1
+        self.send_packet("revenueui", "getOnTVPanel", req)
+
+    def _heartbeat(self):
+        heart_beat_req = HuyaUserHeartBeatReq()
+        heart_beat_req.tId = self._get_user_id()
+        heart_beat_req.lTid = self.info["lChannelId"]
+        heart_beat_req.lSid = self.info["lSubChannelId"]
+        heart_beat_req.lPid = self.info["yyuid"]
+        heart_beat_req.bWatchVideo = True
+        heart_beat_req.eLineType = EStreamLineType.STREAM_LINE_AL
+        heart_beat_req.iFps = 0
+        heart_beat_req.iAttendee = 0
+        heart_beat_req.iLastHeartElapseTime = 0
+        self.send_packet("onlineui", "OnUserHeartBeat", heart_beat_req)
+
+    def send_packet(self, servant: str, func: str, req):
+        try:
+            wup_req = Wup()
+            wup_req.servant = servant
+            wup_req.func = func
+            wup_req.put(vtype=tarscore.struct, name="tReq", value=req)
+            webCommand = HuyaWebSocketCommand()
+            webCommand.iCmdType = EWebSocketCommandType.EWSCmd_WupReq
+            webCommand.vData = wup_req.encode_v3()
+            jceStream = tarscore.TarsOutputStream()
+            webCommand.writeTo(jceStream, webCommand)
+            asyncio.create_task(self._sendMsg(jceStream.getBuffer()))
+        except Exception as e:
+            print("onError:", e)
+            return
+
+    async def _sendMsg(self, message):
+        await self._client.send(message)
+    
+    async def _start_ws(self):
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        ssl_context.options |= ssl.OP_NO_SSLv2
+        ssl_context.options |= ssl.OP_NO_SSLv3
+        ssl_context.options |= ssl.OP_NO_TLSv1
+        ssl_context.options |= ssl.OP_NO_TLSv1_1
+        ssl_context.set_ciphers("DEFAULT")
+        self._client = await websockets.connect(self.wss_url, ssl=ssl_context, compression=None, open_timeout=self.timeout, max_size=None)
+
+        asyncio.create_task(self._recv_loop())
+        self._get_gift()
+        self._get_on_tv_panel()
+        self._get_chat()
+        self._heartbeat()
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_interval())
+
+    async def _heartbeat_interval(self):
         while True:
-            # 使用 async for msg in self.__ws
-            # 会导致在连接断开时 需要很长时间15min或者更多才能检测到
-            msg = await self.__ws.receive()
+            await asyncio.sleep(self.heartbeatTime)
+            self._heartbeat()
 
-            if msg.type in [aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR]:
-                # 连接关闭的异常 会到外层统一处理
-                raise self.WebsocketErrorException()
-
-            try:
-                result = self.__site.decode_msg(msg.data)
-
-                if isinstance(result, tuple):
-                    ms, ack = result
-                    if ack is not None:
-                        # 发送ack包
-                        if type(ack) == str:
-                            await self.__ws.send_str(ack)
-                        else:
-                            await self.__ws.send_bytes(ack)
-                else:
-                    ms = result
-
-                for m in ms:
-                    await self.__dm_queue.put(m)
-            except asyncio.CancelledError:
-                raise
-            except:
-                logger.exception(f"{DanmakuClient.__name__}:{self.__url}: 弹幕接收异常")
-                continue
-                # await asyncio.sleep(10) 无需等待 直接获取下一条websocket消息
-                # 这里出现异常只会是 decode_msg 的问题
-
-
-    def start(self):
-        init_event = threading.Event()
-
-        async def __init():
-            logger.info(f'开始弹幕录制: {self.__url}')
-            self.__record_task = asyncio.create_task(self.__run())
-            init_event.set()
-            try:
-                await self.__record_task
-            except asyncio.CancelledError:
-                pass
-            self.__record_task = None
-            logger.info(f'结束弹幕录制: {self.__url}')
-
-        threading.Thread(target=asyncio.run, args=(__init(),)).start()
-        # 等待初始化完成避免未初始化完成的时候就停止任务
-        init_event.wait()
-
-    def save(self, file_name: Optional[str] = None):
-        if self.__record_task:
-            logger.debug(f"{DanmakuClient.__name__}:{self.__url}: 弹幕save")
-            init_event = threading.Event()
-            self.__dm_queue.put_nowait({
-                "msg_type": "save",
-                "file_name": file_name,
-                "callback": lambda: init_event.set()
-            })
-            init_event.wait()
-
-    def stop(self):
-        if self.__record_task:
-            logger.info(f"{DanmakuClient.__name__}:{self.__url}: 弹幕stop")
-            self.__dm_queue.put_nowait({
-                "msg_type": "stop",
-            })
-
-    async def __run(self):
+    async def _recv_loop(self):
         try:
-            self.__dm_queue = asyncio.Queue()
-            self.__hs = aiohttp.ClientSession()
             while True:
-                danmaku_tasks = []
-                try:
-                    await self.__init_ws()
-                    danmaku_tasks = [asyncio.create_task(self.__heartbeats()),
-                                     asyncio.create_task(self.__fetch_danmaku())]
-                    await asyncio.gather(*danmaku_tasks)
-                except asyncio.CancelledError:
-                    raise
-                except self.WebsocketErrorException:
-                    logger.warning(f"{DanmakuClient.__name__}:{self.__url}: 弹幕连接异常,将在 30 秒后重试", exc_info=True)
-                except:
-                    # 记录异常不到外部处理
-                    logger.exception(f"{DanmakuClient.__name__}:{self.__url}: 弹幕异常,将在 30 秒后重试")
-                finally:
-                    if danmaku_tasks:
-                        for danmaku_task in danmaku_tasks:
-                            danmaku_task.cancel()
-                        await asyncio.wait(danmaku_tasks)
-                    if self.__ws is not None and not self.__ws.closed:
-                        await self.__ws.close()
-                await asyncio.sleep(30)
-        finally:
-            if self.__print_task:
-                self.__print_task.cancel()
-                await asyncio.wait([self.__print_task])
-            if self.__hs:
-                await self.__hs.close()
+                msg = await self._client.recv()   # <- 逐条收消息
+                self._on_message(msg)
+        except Exception as e:
+            print("WebSocket recv error:", e)
+
+    def handle_gift_info(self, message):
+        for item in message.vPropsItemList:
+            name = item.sPropsName.decode("utf8")
+            icon = ""
+            try:
+                if item.vPropView and len(item.vPropView) > 0:
+                    name = item.vPropView[0].name.decode("utf8")
+
+                if item.vPropsIdentity and len(item.vPropsIdentity) > 0:
+                    raw = item.vPropsIdentity[0].sPropsWeb.decode("utf8") or ""
+                    icon = raw.split("&")[0]
+
+                self._gift_info[str(item.iPropsId)] = {
+                    "name": name,
+                    "price": int(item.iPropsYb) / 100,
+                    "icon": icon,
+                }
+            except Exception:
+                pass
+
+    def _on_message(self, message):
+        buf = memoryview(message).tobytes()
+        stream = tarscore.TarsInputStream(buf)
+        webCommand = HuyaWebSocketCommand()
+        resData = webCommand.readFrom(stream)
+        if resData.iCmdType == EWebSocketCommandType.EWSCmd_WupRsp:
+            try:
+                wup = Wup()
+                wup.decode_v3(resData.vData)
+                funcName = wup.func.decode("utf8")
+                rsp_cls = TafMx.WupMapping.get(funcName)
+                if rsp_cls is not None:
+                    rsp_obj = wup.get(vtype=rsp_cls, name="tRsp")
+                    if funcName == "getPropsList":
+                        self.handle_gift_info(rsp_obj)
+            except Exception as e:
+                print("WupRsp decode error:", e)
+
+        if resData.iCmdType == EWebSocketCommandType.EWSCmdS2C_MsgPushReq:
+            try:
+                ios = tarscore.TarsInputStream(resData.vData)
+                push_message = HuyaWSPushMessage()
+                data = push_message.readFrom(ios)
+                mcs = int(data.iUri)
+                ios_msg = tarscore.TarsInputStream(data.sMsg)
+                uri_cls = TafMx.UriMapping.get(mcs)
+                if uri_cls is not None:
+                    source = uri_cls()
+                    msg =  source.readFrom(ios_msg)
+                    if mcs == 1400 and "normal" in self.speak_txt:
+                        nickName = msg.tUserInfo.sNickName.decode("utf8")
+                        txt = msg.sContent.decode("utf8")
+                        print(f"{nickName}说: {txt}")
+                        self.tts.speak_normal(f"{nickName}说{txt}")
+                    elif mcs == 6501:
+                        gift = self._gift_info.get(str(msg.iItemType), {"price": 0})
+                        nickName = msg.sSenderNick.decode("utf8"),
+                        price = gift.get("price", 0)
+                        text = msg.sCustomText.decode("utf8")
+                        # 如果有 custom_text 说明是上头条走上头条逻辑
+                        if text and "highenergy" in self.speak_txt and price > self.min_price and price < self.max_price + 1:
+                            print(f"[高能] {nickName} ({price} 元): {text}")
+                            self.tts.speak_normal(f"{nickName}说{text}")
+                        else:
+                            print(f"[礼物] {nickName} 送出 {int(msg.iItemCount)} 个 {gift.get('name')}")
+                    elif mcs in (6502, 6507):
+                        gift = self._gift_info.get(str(msg.iItemType), {"price": 0})
+                        print(f"[礼物] {nickName} 送出 {int(msg.iItemCount)} 个 {gift.get('name')}")
+            except Exception as e:
+                print("WupRsp decode error:", e)
+
+    
+    async def start(self):
+        self.info = await self._get_room_info()
+        if self.info:
+            await self._start_ws()

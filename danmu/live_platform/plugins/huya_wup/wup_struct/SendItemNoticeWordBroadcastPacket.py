@@ -1,6 +1,6 @@
 from live_platform.common.tars import tarscore
 
-class HuyaSendItemNoticeWordBroadcastPacket:
+class HuyaSendItemNoticeWordBroadcastPacket(tarscore.struct):
     __tars_class__ = "Huya.SendItemNoticeWordBroadcastPacket"
 
     def __init__(self):

@@ -18,6 +18,7 @@ class HuyaWSRegisterGroupReq(tarscore.struct):
         value = HuyaWSRegisterGroupReq()
         value.vGroupId = ios.read(value.VecStr, 0, False)
         value.sToken = ios.read(tarscore.string, 1, False)
+        return value
 
     def debug(self):
         print("------- HuyaWSRegisterGroupReq DEBUG -------")

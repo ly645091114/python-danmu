@@ -85,6 +85,9 @@ async def connect_douyu(
     broadcast: Callable[[Dict[str, Any]], Awaitable[None]],
     use_socks_proxy: bool = False,
     ws_url: str = "wss://danmuproxy.douyu.com:8501/",
+    min_price: int = 0,
+    max_price: int = 10,
+    speak_txt = ["highenergy"]
 ):
     """
     连接斗鱼并转发消息到 OBS & TTS
@@ -130,7 +133,7 @@ async def connect_douyu(
                         msg_type = msg.get("type", "")
 
                         # 普通弹幕
-                        if msg_type == "chatmsg":
+                        if msg_type == "chatmsg" and "normal" in speak_txt:
                             uname = msg.get("nn", "某位观众")
                             text = msg.get("txt", "")
                             print(f"[{now}] [弹幕] {uname}：{text}")
@@ -143,7 +146,7 @@ async def connect_douyu(
                                 "time": now,
                             }
                             asyncio.create_task(broadcast(event))
-                            tts.speak_normal(text)
+                            tts.speak_normal(f"{uname}说{text}")
 
                         # # 礼物
                         # elif msg_type == "dgb":
@@ -163,7 +166,7 @@ async def connect_douyu(
                         #     tts.speak_normal(f"{uname}送出了{cnt}个{gname}")
 
                         # 高能弹幕（SuperChat）
-                        elif msg_type == "voice_trlt":
+                        elif msg_type == "voice_trlt" and "highenergy" in speak_txt:
                             list_raw = msg.get("list", "")
                             data_map = parse_douyu_list(list_raw) if list_raw else {}
 
@@ -176,7 +179,7 @@ async def connect_douyu(
                                     price_yuan = price_fen / 100.0
                                     print(f"[{now}] [高能] {uname} ({price_yuan} 元): {text}")
 
-                                    if price_fen == 1000:
+                                    if price_yuan > min_price and price_yuan < max_price + 1:
                                         event = {
                                             "event": "superchat",
                                             "platform": "douyu",
@@ -186,7 +189,7 @@ async def connect_douyu(
                                             "time": now,
                                         }
                                         asyncio.create_task(broadcast(event))
-                                        tts.speak_force(f"${uname}说:{text}")
+                                        tts.speak_force(f"${uname}说{text}")
                                 except ValueError:
                                     pass
 
