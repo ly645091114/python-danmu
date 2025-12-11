@@ -2,11 +2,7 @@
 
 ## 准备工作(开发者可以忽略)
 
-[下载并且安装git(期间选项都不用管一路next到完成)](https://github.com/git-for-windows/git/releases/download/v2.52.0.windows.1/Git-2.52.0-64-bit.exe)
-
 [下载并且安装python3.11(如果电脑没有装过的时候需要钩上"Add python.exe to PATH")](https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe)
-
-[下载并安装visualstudio, 安装时选择大模块选第一项C++后安装](https://visualstudio.microsoft.com/zh-hans/thank-you-downloading-visual-studio/?sku=Community&channel=Stable&version=VS18&source=VSLandingPage&cid=2500&passive=false)
 
 ## 拉取 CosyVoice 模型
 
