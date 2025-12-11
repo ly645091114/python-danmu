@@ -50,3 +50,9 @@ voice/config.txt
 # 如果有自己想用的原声需要提供一段30秒以内的 .wav文件音频和音频完整文案（断句用空格）的 .txt文件，放入source文件夹下，命名格式必须和 SOURCE_ID 一致例如:dy.txt ,dy.wav
 SOURCE_ID=fy #声源id
 ```
+
+## 如何启动
+
+运行 danmu/run_danmu.py
+
+运行 voice/run_voice.py
