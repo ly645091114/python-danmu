@@ -177,6 +177,7 @@ class Huya:
         ssl_context.options |= ssl.OP_NO_TLSv1_1
         ssl_context.set_ciphers("DEFAULT")
         self._client = await websockets.connect(self.wss_url, ssl=ssl_context, compression=None, open_timeout=self.timeout, max_size=None)
+        print(f"已连接虎牙弹幕服务器，房间 {self.room_Id}")
 
         asyncio.create_task(self._recv_loop())
         self._get_gift()
