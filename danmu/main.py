@@ -23,6 +23,8 @@ OBS_WS_PORT = config.get("OBS_WS_PORT", 8765)
 MIN_PRICE=config.get("MIN_PRICE", 0)
 MAX_PRICE=config.get("MAX_PRICE", 10)
 SPEAK_TXT=config.get("SPEAK_TXT", "normal,highenergy").split(",")
+GIFT_MIN_PRICE=config.get("GIFT_MIN_PRICE", 100)
+GIFT_MAX_PRICE=config.get("GIFT_MAX_PRICE", 0)
 
 async def main():
     # 1. 初始化 TTS 管理器
@@ -38,11 +40,21 @@ async def main():
                 room_id=ROOM_ID,
                 tts=tts,
                 broadcast=broadcast_to_overlay,
+                min_price=MIN_PRICE,
+                max_price=MAX_PRICE,
                 use_socks_proxy=USE_SOCKS_PROXY,
             )
         )
     elif PLATFORM == "huya":
-        client = Huya(room_Id=ROOM_ID, tts=tts, speak_txt=SPEAK_TXT)
+        client = Huya(
+            room_Id=ROOM_ID,
+            tts=tts,
+            speak_txt=SPEAK_TXT,
+            min_price=MIN_PRICE,
+            max_price=MAX_PRICE,
+            gift_min_price=GIFT_MIN_PRICE,
+            gift_max_price=GIFT_MAX_PRICE
+        )
         # client.start()
         asyncio.create_task(client.start())
     else:

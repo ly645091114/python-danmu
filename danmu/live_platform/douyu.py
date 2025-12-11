@@ -148,22 +148,22 @@ async def connect_douyu(
                             asyncio.create_task(broadcast(event))
                             tts.speak_normal(f"{uname}说{text}")
 
-                        # # 礼物
-                        # elif msg_type == "dgb":
-                        #     uname = msg.get("nn", "某位观众")
-                        #     gname = msg.get("gft", "礼物")
-                        #     cnt = msg.get("gfc", "1")
-                        #     print(f"[{now}] [礼物] {uname} 送出 {cnt} 个 {gname}")
+                        # 礼物
+                        elif msg_type == "dgb" and "gift" in speak_txt:
+                            uname = msg.get("nn", "某位观众")
+                            gname = msg.get("gft", "礼物")
+                            cnt = msg.get("gfc", "1")
+                            print(f"[礼物] {uname} 送出 {cnt} 个 {gname}")
 
-                        #     event = {
-                        #         "event": "gift",
-                        #         "user": uname,
-                        #         "gift_name": gname,
-                        #         "count": cnt,
-                        #         "time": now,
-                        #     }
-                        #     asyncio.create_task(broadcast_to_overlay(event))
-                        #     tts.speak_normal(f"{uname}送出了{cnt}个{gname}")
+                            event = {
+                                "event": "gift",
+                                "user": uname,
+                                "gift_name": gname,
+                                "count": cnt,
+                                "time": now,
+                            }
+                            asyncio.create_task(broadcast(event))
+                            tts.speak_force(f"谢谢{uname}的{int(cnt)}个{gname}")
 
                         # 高能弹幕（SuperChat）
                         elif msg_type == "voice_trlt" and "highenergy" in speak_txt:
@@ -177,9 +177,14 @@ async def connect_douyu(
                                     raw_price = data_map.get("price") or "0"
                                     price_fen = int(raw_price)
                                     price_yuan = price_fen / 100.0
-                                    print(f"[{now}] [高能] {uname} ({price_yuan} 元): {text}")
+                                    print(f"[高能] {uname} ({price_yuan} 元): {text}")
 
-                                    if price_yuan > min_price and price_yuan < max_price + 1:
+                                    if (
+                                        price_yuan >= min_price
+                                        and (
+                                            not max_price or price_yuan < max_price + 1
+                                        )
+                                    ):
                                         event = {
                                             "event": "superchat",
                                             "platform": "douyu",

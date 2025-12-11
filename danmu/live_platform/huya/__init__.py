@@ -30,6 +30,8 @@ class Huya:
             speak_txt = ["highenergy"],
             min_price: int = 0,
             max_price: int = 10,
+            gift_min_price = 100,
+            gift_max_price = 0
     ):
         self.wss_url = 'wss://cdnws.api.huya.com/'
         self.heartbeatInterval = 60
@@ -49,6 +51,8 @@ class Huya:
         self.speak_txt = speak_txt
         self.min_price = min_price
         self.max_price = max_price
+        self.gift_min_price = gift_min_price
+        self.gift_max_price = gift_max_price
 
 
     def _get_user_id(self):
@@ -255,15 +259,38 @@ class Huya:
                         price = gift.get("price", 0)
                         text = msg.sCustomText.decode("utf8")
                         # 如果有 custom_text 说明是上头条走上头条逻辑
-                        if text and "highenergy" in self.speak_txt and price > self.min_price and price < self.max_price + 1:
+                        if (
+                            text
+                            and "highenergy" in self.speak_txt
+                            and price >= self.min_price
+                            and (
+                                not self.max_price or price < self.max_price + 1
+                            )
+                        ):
                             print(f"[高能] {nickName} ({price} 元): {text}")
-                            self.tts.speak_normal(f"{nickName}说{text}")
-                        else:
+                            self.tts.speak_force(f"{nickName}说{text}")
+                        elif (
+                            "gift" in self.speak_txt
+                            and price >= self.gift_min_price
+                            and (
+                                not self.gift_max_price or price < self.gift_max_price + 1
+                            )
+                        ):
                             print(f"[礼物] {nickName} 送出 {int(msg.iItemCount)} 个 {gift.get('name')}")
+                            self.tts.speak_force(f"谢谢{nickName}的{int(msg.iItemCount)}个{gift.get('name')}")
 
-                    elif mcs in (6502, 6507):
+                    elif mcs in (6502, 6507) and "gift" in self.speak_txt:
                         gift = self._gift_info.get(str(msg.iItemType), {"price": 0})
-                        print(f"[礼物] {nickName} 送出 {int(msg.iItemCount)} 个 {gift.get('name')}")
+                        price = gift.get("price", 0)
+                        if (
+                            "gift" in self.speak_txt
+                            and price >= self.gift_min_price
+                            and (
+                                not self.gift_max_price or price < self.gift_max_price + 1
+                            )
+                        ):
+                            print(f"[礼物] {nickName} 送出 {int(msg.iItemCount)} 个 {gift.get('name')}")
+                            self.tts.speak_force(f"谢谢{nickName}的{int(msg.iItemCount)}个{gift.get('name')}")
             except Exception as e:
                 print("WupRsp decode error:", e)
 

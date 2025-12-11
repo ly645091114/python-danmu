@@ -3,4 +3,5 @@ venv
 .DS_Store
 CosyVoice
 pretrained_models
+test
 __pycache__
