@@ -24,6 +24,15 @@ git lfs install
 git clone https://www.modelscope.cn/iic/CosyVoice2-0.5B.git pretrained_models/CosyVoice2-0.5B
 ```
 
+#### 如果你是 RTX50系以上的显卡 voice/CosyVoice/requirements.txt
+
+```
+--extra-index-url https://download.pytorch.org/whl/cu121 #需要将cu121改成cu128
+...
+torch==2.3.1 #需要将 2.3.1 改成 2.7.1
+torchaudio==2.3.1#需要将 2.3.1 改成 2.7.1
+```
+
 ## 直播相关的配置
 
 danmu/config.txt
