@@ -6,3 +6,4 @@ soundfile
 requests
 aiohttp
 lxml
+python-dotenv

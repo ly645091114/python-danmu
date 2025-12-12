@@ -1,0 +1,34 @@
+from live_platform.huya.common.tars import tarscore
+
+class HuyaWebSocketCommand(tarscore.struct):
+    __tars_class__ = "Huya.WebSocketCommand"
+
+    def __init__(self):
+        self.iCmdType: tarscore.int32 = 0
+        self.vData: tarscore.bytes = b''
+        self.lRequestId: tarscore.int64 = 0
+        self.traceId: tarscore.string = ""
+
+    @staticmethod
+    def writeTo(oos: tarscore.TarsOutputStream, value: "HuyaWebSocketCommand"):
+        oos.write(tarscore.int32, 0, value.iCmdType)
+        oos.write(tarscore.bytes, 1, value.vData)
+        oos.write(tarscore.int64, 2, value.lRequestId)
+        oos.write(tarscore.string, 3, value.traceId)
+
+    @staticmethod
+    def readFrom(ios: tarscore.TarsInputStream):
+        value = HuyaWebSocketCommand()
+        value.iCmdType = ios.read(tarscore.int32, 0, False)
+        value.vData = ios.read(tarscore.bytes, 1, False)
+        value.lRequestId = ios.read(tarscore.int64, 2, False)
+        value.traceId = ios.read(tarscore.string, 3, False)
+        return value
+
+    def debug(self):
+        print("------- HuyaWebSocketCommand DEBUG -------")
+        print("iCmdType:", int(self.iCmdType))
+        print("vData:", self.vData)
+        print("lRequestId:", int(self.lRequestId))
+        print("traceId:", self.traceId)
+        print("--------------------------")

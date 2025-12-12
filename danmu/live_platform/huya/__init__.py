@@ -1,59 +1,52 @@
 import re
 import ssl
+from typing import Any
 import aiohttp
 import certifi
 import websockets
 import asyncio
-from live_platform.plugins.huya_wup.wup import Wup
-from live_platform.plugins.huya_wup.wup_struct.TafMx import TafMx
-from app.tts_manager import TTSManager
 
-from live_platform.common.tars import tarscore
-from live_platform.plugins.huya_wup.wup_struct.UserId import HuyaUserId
-from live_platform.plugins.huya_wup.wup_struct.GetPropsListReq import HuyaGetPropsListReq
-from live_platform.plugins.huya_wup.wup_struct import EClientTemplateType, EStreamLineType, EWebSocketCommandType
-from live_platform.plugins.huya_wup.wup_struct.WebSocketCommand import HuyaWebSocketCommand
-from live_platform.plugins.huya_wup.wup_struct.WSRegisterGroupReq import HuyaWSRegisterGroupReq
-from live_platform.plugins.huya_wup.wup_struct.UserHeartBeatReq import HuyaUserHeartBeatReq
-from live_platform.plugins.huya_wup.wup_struct.WSPushMessage import HuyaWSPushMessage
-from live_platform.plugins.huya_wup.wup_struct.OnTVUserReq import HuyaOnTVUserReq
+from live_platform.huya.plugins.huya_wup.wup import Wup
+from live_platform.huya.plugins.huya_wup.wup_struct.TafMx import TafMx
+from live_platform.huya.message import formatMsg
 
+from live_platform import PlatformSocketBase
+from live_platform.huya.common.tars import tarscore
+from live_platform.huya.plugins.huya_wup.wup_struct.UserId import HuyaUserId
+from live_platform.huya.plugins.huya_wup.wup_struct.GetPropsListReq import HuyaGetPropsListReq
+from live_platform.huya.plugins.huya_wup.wup_struct import EClientTemplateType, EStreamLineType, EWebSocketCommandType
+from live_platform.huya.plugins.huya_wup.wup_struct.WebSocketCommand import HuyaWebSocketCommand
+from live_platform.huya.plugins.huya_wup.wup_struct.WSRegisterGroupReq import HuyaWSRegisterGroupReq
+from live_platform.huya.plugins.huya_wup.wup_struct.UserHeartBeatReq import HuyaUserHeartBeatReq
+from live_platform.huya.plugins.huya_wup.wup_struct.OnTVUserReq import HuyaOnTVUserReq
 
-class Huya:
-    
+class HuyaClient(PlatformSocketBase):
+
     def __init__(
-            self,
-            room_Id,
-            sHuYaUA="webh5&1.0.0&huya",
-            sCookie="",
-            tts: TTSManager = None,
-            speak_txt = ["highenergy"],
-            min_price: int = 0,
-            max_price: int = 10,
-            gift_min_price = 100,
-            gift_max_price = 0
+        self,
+        room_id: int,
+        *,
+        use_socks_proxy: bool = False,
+        ws_url: str = "wss://cdnws.api.huya.com/",
+        idle_timeout: int = 120,          # 假死检测：多少秒没收到任何数据就重连
+        heartbeat_interval: int = 60,     # 心跳间隔（斗鱼/虎牙按你协议调）
     ):
-        self.wss_url = 'wss://cdnws.api.huya.com/'
-        self.heartbeatInterval = 60
+        super().__init__(
+            platform="huya",
+            room_id=room_id,
+            heartbeat_interval=heartbeat_interval,
+            idle_timeout=idle_timeout,
+            use_socks_proxy=use_socks_proxy
+        )
         self.headers = {
             'user-agent': "'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1 Edg/91.0.4472.124'",
         }
-        self._client = None
-        self._heartbeat_task = None
-        self.room_Id = room_Id
-        self.info = None
+        self._ws_url = ws_url
         self.timeout = 60
-        self.heartbeatTime = 60
-        self.sHuYaUA = sHuYaUA
-        self.cookies = sCookie
+        self.sHuYaUA = "webh5&1.0.0&huya"
+        self.cookies = ""
+        self.info = None
         self._gift_info = {}
-        self.tts = tts
-        self.speak_txt = speak_txt
-        self.min_price = min_price
-        self.max_price = max_price
-        self.gift_min_price = gift_min_price
-        self.gift_max_price = gift_max_price
-
 
     def _get_user_id(self):
         user = HuyaUserId()
@@ -74,7 +67,7 @@ class Huya:
                 ssl_context.options |= ssl.OP_NO_TLSv1_1
                 ssl_context.set_ciphers("DEFAULT")
         
-                async with session.get(f'https://m.huya.com/{self.room_Id}', ssl_context=ssl_context, headers=self.headers, timeout=self.timeout *  1000) as resp:
+                async with session.get(f'https://m.huya.com/{self.room_id}', ssl_context=ssl_context, headers=self.headers, timeout=self.timeout *  1000) as resp:
                     if resp.status != 200:
                         raise RuntimeError(f"获取房间信息失败 status={resp.status}")
                     room_page = await resp.text()
@@ -96,26 +89,20 @@ class Huya:
             if not info["presenterUid"] or not info["yyuid"]:
                 return
             if not info["lChannelId"]:
-                raise RuntimeError(f"房间 {self.room_Id} 不存在或已停播")
+                raise RuntimeError(f"房间 {self.room_id} 不存在或已停播")
             
             return info
         except Exception as e:
             print("onError:", e)
             return
-
-    @staticmethod
-    async def get_ws_info(url):
-        room_id = url.split('huya.com/')[1].split('/')[0].split('?')[0]
-        room_info = await Huya._get_room_info(room_id)
-        return room_info
     
-    def _get_gift(self):
+    def _get_gift(self, ws):
         prop_req = HuyaGetPropsListReq()
         prop_req.tUserId = self._get_user_id()
         prop_req.iTemplateType = EClientTemplateType.TPL_MIRROR
-        self.send_packet("PropsUIServer", "getPropsList", prop_req)
+        self.send_packet("PropsUIServer", "getPropsList", prop_req, ws)
     
-    def _get_chat(self):
+    def _get_chat(self, ws):
         req = HuyaWSRegisterGroupReq()
         req.vGroupId.append(f'live:{self.info["presenterUid"]}')
         req.vGroupId.append(f'chat:{self.info["presenterUid"]}')
@@ -126,31 +113,18 @@ class Huya:
         webCommand.vData = stream.getBuffer()
         stream = tarscore.TarsOutputStream()
         webCommand.writeTo(stream, webCommand)
-        asyncio.create_task(self._sendMsg(stream.getBuffer()))
+        asyncio.create_task(self._sendMsg(stream.getBuffer(), ws))
 
-    def _get_on_tv_panel(self):
+    def _get_on_tv_panel(self, ws):
         req = HuyaOnTVUserReq()
         req.tUserId = self._get_user_id()
         req.lPid = self.info["presenterUid"]
         req.lTid = self.info["lChannelId"]
         req.lSid = self.info["lSubChannelId"]
         req.iSupportFlag = 1
-        self.send_packet("revenueui", "getOnTVPanel", req)
+        self.send_packet("revenueui", "getOnTVPanel", req, ws)
 
-    def _heartbeat(self):
-        heart_beat_req = HuyaUserHeartBeatReq()
-        heart_beat_req.tId = self._get_user_id()
-        heart_beat_req.lTid = self.info["lChannelId"]
-        heart_beat_req.lSid = self.info["lSubChannelId"]
-        heart_beat_req.lPid = self.info["yyuid"]
-        heart_beat_req.bWatchVideo = True
-        heart_beat_req.eLineType = EStreamLineType.STREAM_LINE_AL
-        heart_beat_req.iFps = 0
-        heart_beat_req.iAttendee = 0
-        heart_beat_req.iLastHeartElapseTime = 0
-        self.send_packet("onlineui", "OnUserHeartBeat", heart_beat_req)
-
-    def send_packet(self, servant: str, func: str, req):
+    def send_packet(self, servant: str, func: str, req, ws):
         try:
             wup_req = Wup()
             wup_req.servant = servant
@@ -161,43 +135,26 @@ class Huya:
             webCommand.vData = wup_req.encode_v3()
             jceStream = tarscore.TarsOutputStream()
             webCommand.writeTo(jceStream, webCommand)
-            asyncio.create_task(self._sendMsg(jceStream.getBuffer()))
+            asyncio.create_task(self._sendMsg(jceStream.getBuffer(), ws))
         except Exception as e:
             print("onError:", e)
             return
 
-    async def _sendMsg(self, message):
-        await self._client.send(message)
-    
-    async def _start_ws(self):
-        ssl_context = ssl.create_default_context(cafile=certifi.where())
-        ssl_context.options |= ssl.OP_NO_SSLv2
-        ssl_context.options |= ssl.OP_NO_SSLv3
-        ssl_context.options |= ssl.OP_NO_TLSv1
-        ssl_context.options |= ssl.OP_NO_TLSv1_1
-        ssl_context.set_ciphers("DEFAULT")
-        self._client = await websockets.connect(self.wss_url, ssl=ssl_context, compression=None, open_timeout=self.timeout, max_size=None)
-        print(f"已连接虎牙弹幕服务器，房间 {self.room_Id}")
+    async def _sendMsg(self, message, ws):
+        await ws.send(message)
 
-        asyncio.create_task(self._recv_loop())
-        self._get_gift()
-        self._get_on_tv_panel()
-        self._get_chat()
-        self._heartbeat()
-        self._heartbeat_task = asyncio.create_task(self._heartbeat_interval())
-
-    async def _heartbeat_interval(self):
-        while True:
-            await asyncio.sleep(self.heartbeatTime)
-            self._heartbeat()
-
-    async def _recv_loop(self):
-        try:
-            while True:
-                msg = await self._client.recv()   # <- 逐条收消息
-                self._on_message(msg)
-        except Exception as e:
-            print("WebSocket recv error:", e)
+    def _heartbeat(self, ws):
+        heart_beat_req = HuyaUserHeartBeatReq()
+        heart_beat_req.tId = self._get_user_id()
+        heart_beat_req.lTid = self.info["lChannelId"]
+        heart_beat_req.lSid = self.info["lSubChannelId"]
+        heart_beat_req.lPid = self.info["yyuid"]
+        heart_beat_req.bWatchVideo = True
+        heart_beat_req.eLineType = EStreamLineType.STREAM_LINE_AL
+        heart_beat_req.iFps = 0
+        heart_beat_req.iAttendee = 0
+        heart_beat_req.iLastHeartElapseTime = 0
+        self.send_packet("onlineui", "OnUserHeartBeat", heart_beat_req, ws)
 
     def handle_gift_info(self, message):
         for item in message.vPropsItemList:
@@ -219,8 +176,25 @@ class Huya:
             except Exception:
                 pass
 
-    def _on_message(self, message):
-        buf = memoryview(message).tobytes()
+    async def _connect_ws(self, ssl_context: ssl.SSLContext):
+        self.info = await self._get_room_info()
+        # ping_interval=None：不使用 websockets 自带 ping，斗鱼用自定义心跳
+        return await websockets.connect(self._ws_url, ssl=ssl_context, compression=None, open_timeout=self.timeout, max_size=None)
+    
+    async def _login_and_join(self, ws):
+        print(f"已连接虎牙弹幕服务器，房间 {self.room_id}")
+        self._get_gift(ws)
+        self._get_on_tv_panel(ws)
+        self._get_chat(ws)
+        return
+    
+    async def _heartbeat_once(self, ws: websockets.WebSocketClientProtocol):
+        """斗鱼心跳"""
+        self._heartbeat(ws)
+        return
+    
+    def _parse_messages(self, raw: Any) -> Any:
+        buf = memoryview(raw).tobytes()
         stream = tarscore.TarsInputStream(buf)
         webCommand = HuyaWebSocketCommand()
         resData = webCommand.readFrom(stream)
@@ -239,64 +213,7 @@ class Huya:
 
         if resData.iCmdType == EWebSocketCommandType.EWSCmdS2C_MsgPushReq:
             try:
-                ios = tarscore.TarsInputStream(resData.vData)
-                push_message = HuyaWSPushMessage()
-                data = push_message.readFrom(ios)
-                mcs = int(data.iUri)
-                ios_msg = tarscore.TarsInputStream(data.sMsg)
-                uri_cls = TafMx.UriMapping.get(mcs)
-                if uri_cls is not None:
-                    source = uri_cls()
-                    msg =  source.readFrom(ios_msg)
-                    if mcs == 1400 and "normal" in self.speak_txt:
-                        nickName = msg.tUserInfo.sNickName.decode("utf8")
-                        txt = msg.sContent.decode("utf8")
-                        print(f"{nickName}说: {txt}")
-                        self.tts.speak_normal(f"{nickName}说{txt}")
-
-                    elif mcs == 6501:
-                        gift = self._gift_info.get(str(msg.iItemType), {"price": 0})
-                        nickName = msg.sSenderNick.decode("utf8"),
-                        price = gift.get("price", 0)
-                        text = msg.sCustomText.decode("utf8")
-                        # 如果有 custom_text 说明是上头条走上头条逻辑
-                        if (
-                            text
-                            and "highenergy" in self.speak_txt
-                            and price >= self.min_price
-                            and (
-                                not self.max_price or price < self.max_price + 1
-                            )
-                        ):
-                            print(f"[高能] {nickName} ({price} 元): {text}")
-                            self.tts.speak_force(f"{nickName}说{text}")
-                        elif (
-                            "gift" in self.speak_txt
-                            and price >= self.gift_min_price
-                            and (
-                                not self.gift_max_price or price < self.gift_max_price + 1
-                            )
-                        ):
-                            print(f"[礼物] {nickName} 送出 {int(msg.iItemCount)} 个 {gift.get('name')}")
-                            self.tts.speak_force(f"谢谢{nickName}的{int(msg.iItemCount)}个{gift.get('name')}")
-
-                    elif mcs in (6502, 6507) and "gift" in self.speak_txt:
-                        gift = self._gift_info.get(str(msg.iItemType), {"price": 0})
-                        price = gift.get("price", 0)
-                        if (
-                            "gift" in self.speak_txt
-                            and price >= self.gift_min_price
-                            and (
-                                not self.gift_max_price or price < self.gift_max_price + 1
-                            )
-                        ):
-                            print(f"[礼物] {nickName} 送出 {int(msg.iItemCount)} 个 {gift.get('name')}")
-                            self.tts.speak_force(f"谢谢{nickName}的{int(msg.iItemCount)}个{gift.get('name')}")
+                return formatMsg(resData.vData, self.room_id, self._gift_info)
             except Exception as e:
                 print("WupRsp decode error:", e)
-
-    
-    async def start(self):
-        self.info = await self._get_room_info()
-        if self.info:
-            await self._start_ws()
+        return

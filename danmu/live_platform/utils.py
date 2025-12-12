@@ -1,6 +1,14 @@
 import os
 import sys
 
+class EmitMessage:
+    def __init__(self):
+        self.platform=""
+        self.roomId=""
+        self.type=""
+        self.time=None
+        self.data=None
+
 
 def setup_proxy_environment(use_socks_proxy: bool):
     """

@@ -5,3 +5,4 @@ CosyVoice
 pretrained_models
 test
 __pycache__
+.env
